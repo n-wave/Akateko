@@ -1,0 +1,9 @@
+JuceLibraryCode
+Source
+../../../msm/msm-gui
+../../../msm/msm-dsp/Common
+/work/software-development-tools/JUCE-4.3.1/modules/
+/work/programming-projects/msm/msm-gui/FilterDisplay.h
+../../../msm/msm-dsp/Filters
+../../../msm/msm-dsp/Generators
+../../../msm/msm-dsp/Processors

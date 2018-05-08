@@ -29,6 +29,8 @@
 #include "/work/programming-projects/msm/msm-gui/EnvelopeDrawing.h"
 
 #include "PluginProcessor.h"
+
+#include <vector>
 //[/Headers]
 
 
@@ -42,6 +44,7 @@
                                                                     //[/Comments]
 */
 class EnvelopeComponent  : public Component,
+                           public SliderListener,
                            public ButtonListener,
                            public ComboBoxListener
 {
@@ -58,17 +61,23 @@ public:
     bool getLoopPoints(float &startPos, float &endPos);
     bool getSustainPoints(float &startPos, float &endPos);
     void getEndPoints(float &startPos, float &endPos);
-
     void setBPM(double bpm);
+
+    void setBeatDivisionStrings(StringArray beatDivStr);
+    void setBeatDivisionValues(std::vector<double> beatDivVal);
+
+    void initDurationSlider();
 
     void setUIState(String state);
     String getUIState();
-
     msmBuffer getBuffer();
+
+    void updateGui();
     //[/UserMethods]
 
     void paint (Graphics& g) override;
     void resized() override;
+    void sliderValueChanged (Slider* sliderThatWasMoved) override;
     void buttonClicked (Button* buttonThatWasClicked) override;
     void comboBoxChanged (ComboBox* comboBoxThatHasChanged) override;
 
@@ -76,6 +85,7 @@ public:
 
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
+    int findClosestTimeDivision(double period);
 
     /* temporary commands, phase out when testing is completed */
     void updateEnvelope(int env);
@@ -90,7 +100,12 @@ private:
 
     double BPM;
 
+    StringArray beatDivision;
+    std::vector<double> valueBeatDivision;
+
+    AudioProcessorParameter *duration;
     AkatekoAudioProcessor &processor;
+    Label &labelRef;
     //[/UserVariables]
 
     //==============================================================================

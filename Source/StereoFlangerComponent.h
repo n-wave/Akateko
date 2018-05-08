@@ -17,17 +17,16 @@
   ==============================================================================
 */
 
-#ifndef __JUCE_HEADER_95E50ED86F3D9A4C__
-#define __JUCE_HEADER_95E50ED86F3D9A4C__
+#ifndef __JUCE_HEADER_F3BDDF681E2CA4F8__
+#define __JUCE_HEADER_F3BDDF681E2CA4F8__
 
 //[Headers]     -- You can add your own extra header files here --
 #include "../JuceLibraryCode/JuceHeader.h"
-#include "/work/programming-projects/msm/msm-gui/StepSequencer.h"
+#include "/work/programming-projects/msm/msm-dsp/Common/BeatDivisor.h"
 #include "/work/programming-projects/msm/msm-gui/ParamSlider.h"
 #include "/work/programming-projects/msm/msm-gui/ParamToggle.h"
-#include "/work/programming-projects/msm/msm-gui/ParamComboBox.h"
+#include "/work/programming-projects/msm/msm-dsp/Generators/QuadratureOscillator.h"
 #include "PluginProcessor.h"
-
 #include <vector>
 //[/Headers]
 
@@ -41,23 +40,24 @@
     Describe your class and how it works here!
                                                                     //[/Comments]
 */
-class StepSequencerComponent  : public Component,
+class StereoFlangerComponent  : public Component,
                                 public ButtonListener,
-                                public SliderListener,
-                                public ComboBoxListener
+                                public SliderListener
 {
 public:
     //==============================================================================
-    StepSequencerComponent (const String &name,AkatekoAudioProcessor &p, Label &label);
-    ~StepSequencerComponent();
+    StereoFlangerComponent (const String &name, AkatekoAudioProcessor &p, Label &label);
+    ~StereoFlangerComponent();
 
     //==============================================================================
     //[UserMethods]     -- You can add your own custom methods in this section.
-    void sliderDragEnded(Slider* sliderThatWasDragged) override;
-    void calculateBeatDivision(double bpm);
+    enum commandIds{
+        update
+    };
 
-    String getUIState();
-    void setUIState(String state);
+    void handleCommandMessage(int commandId) override;
+    void setBeatDivisionStrings(StringArray beatDivStr);
+    void setBeatDivisionvalues(std::vector<double> beatDivVal);
 
     void updateGui();
     //[/UserMethods]
@@ -66,45 +66,45 @@ public:
     void resized() override;
     void buttonClicked (Button* buttonThatWasClicked) override;
     void sliderValueChanged (Slider* sliderThatWasMoved) override;
-    void comboBoxChanged (ComboBox* comboBoxThatHasChanged) override;
-    void handleCommandMessage (int commandId) override;
+
+
 
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
-    void initialiseBeatDivision();
-    void initDurationSlider(); //Call when Envelope has been set
-    int findClosestTimeDivision(double period);
+    void resetShapeButtonColour(int ShapeButton);
+    int findClosestTimeDivision(double freq);
+    void initRateSlider();
 
-    StringArray beatDivision;
-    std::vector<double> valueBeatDivision;
 
-    int stepAmount;
-    double curveMidPoint;
-
-    AudioProcessorParameter *duration;
     AkatekoAudioProcessor &processor;
     Label &labelRef;
+
+    AudioProcessorParameter *wave;
+    AudioProcessorParameter *sync;
+    AudioProcessorParameter *rate;
+    AudioProcessorParameter *phase;
+
+    BeatDivisor beatDivisor;
+    StringArray beatDivision;
+    std::vector<double> valueBeatDivision;
     //[/UserVariables]
 
     //==============================================================================
-    ScopedPointer<StepSequencer> stepSequencer;
-    ScopedPointer<Slider> stepLengthSlider;
+    ScopedPointer<Slider> feedBackSlider;
+    ScopedPointer<ToggleButton> SyncToggle;
+    ScopedPointer<Slider> phaseSlider;
+    ScopedPointer<Slider> depthSlider;
+    ScopedPointer<Slider> rateSlider;
+    ScopedPointer<ToggleButton> crossFB;
     ScopedPointer<ToggleButton> enableToggle;
-    ScopedPointer<ToggleButton> syncToggle;
-    ScopedPointer<Slider> durationSlider;
-    ScopedPointer<ComboBox> stepComboBox;
-    ScopedPointer<Label> nameLabel;
-    ScopedPointer<Slider> offsetSlider;
-    ScopedPointer<Slider> exponentSlider;
-    ScopedPointer<ToggleButton> chopperToggle;
-    ScopedPointer<TextButton> textButton;
+    ScopedPointer<Slider> waveSlider;
 
 
     //==============================================================================
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (StepSequencerComponent)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (StereoFlangerComponent)
 };
 
 //[EndFile] You can add extra defines here...
 //[/EndFile]
 
-#endif   // __JUCE_HEADER_95E50ED86F3D9A4C__
+#endif   // __JUCE_HEADER_F3BDDF681E2CA4F8__

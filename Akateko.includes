@@ -7,3 +7,5 @@ Source
 ../../../msm/msm-dsp/Filters
 ../../../msm/msm-dsp/Generators
 ../../../msm/msm-dsp/Processors
+../../../msm/msm-dsp/WaveShaping
+../../../msm/msm-utilities

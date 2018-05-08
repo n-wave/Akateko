@@ -17,18 +17,15 @@
   ==============================================================================
 */
 
-#ifndef __JUCE_HEADER_95E50ED86F3D9A4C__
-#define __JUCE_HEADER_95E50ED86F3D9A4C__
+#ifndef __JUCE_HEADER_E2DCC5129BDB47A2__
+#define __JUCE_HEADER_E2DCC5129BDB47A2__
 
 //[Headers]     -- You can add your own extra header files here --
 #include "../JuceLibraryCode/JuceHeader.h"
-#include "/work/programming-projects/msm/msm-gui/StepSequencer.h"
+#include "PluginProcessor.h"
 #include "/work/programming-projects/msm/msm-gui/ParamSlider.h"
 #include "/work/programming-projects/msm/msm-gui/ParamToggle.h"
-#include "/work/programming-projects/msm/msm-gui/ParamComboBox.h"
-#include "PluginProcessor.h"
-
-#include <vector>
+#include "/work/programming-projects/msm/msm-dsp/Generators/QuadratureOscillator.h"
 //[/Headers]
 
 
@@ -41,70 +38,57 @@
     Describe your class and how it works here!
                                                                     //[/Comments]
 */
-class StepSequencerComponent  : public Component,
-                                public ButtonListener,
-                                public SliderListener,
-                                public ComboBoxListener
+class DimensionChorusComponent  : public Component,
+                                  public SliderListener
 {
 public:
     //==============================================================================
-    StepSequencerComponent (const String &name,AkatekoAudioProcessor &p, Label &label);
-    ~StepSequencerComponent();
+    DimensionChorusComponent (const String &name, AkatekoAudioProcessor &p, Label &label);
+    ~DimensionChorusComponent();
 
     //==============================================================================
     //[UserMethods]     -- You can add your own custom methods in this section.
-    void sliderDragEnded(Slider* sliderThatWasDragged) override;
-    void calculateBeatDivision(double bpm);
+    enum commandIds{
+        update
+    };
 
-    String getUIState();
-    void setUIState(String state);
-
+    void handleCommandMessage(int commandId) override;
     void updateGui();
     //[/UserMethods]
 
     void paint (Graphics& g) override;
     void resized() override;
-    void buttonClicked (Button* buttonThatWasClicked) override;
     void sliderValueChanged (Slider* sliderThatWasMoved) override;
-    void comboBoxChanged (ComboBox* comboBoxThatHasChanged) override;
-    void handleCommandMessage (int commandId) override;
+
+
 
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
-    void initialiseBeatDivision();
-    void initDurationSlider(); //Call when Envelope has been set
-    int findClosestTimeDivision(double period);
-
-    StringArray beatDivision;
-    std::vector<double> valueBeatDivision;
-
-    int stepAmount;
-    double curveMidPoint;
-
-    AudioProcessorParameter *duration;
     AkatekoAudioProcessor &processor;
     Label &labelRef;
+
+    AudioProcessorParameter *sync;
+    AudioProcessorParameter *wave;
+    AudioProcessorParameter *spread;
     //[/UserVariables]
 
     //==============================================================================
-    ScopedPointer<StepSequencer> stepSequencer;
-    ScopedPointer<Slider> stepLengthSlider;
+    ScopedPointer<Slider> rateSlider;
+    ScopedPointer<Slider> depthSlider;
+    ScopedPointer<Slider> spreadSlider;
+    ScopedPointer<Slider> centerAmpSlider;
+    ScopedPointer<Slider> mixSlider;
+    ScopedPointer<Slider> centerPanSlider;
+    ScopedPointer<Slider> frequencySlider;
+    ScopedPointer<Slider> waveSlider;
     ScopedPointer<ToggleButton> enableToggle;
-    ScopedPointer<ToggleButton> syncToggle;
-    ScopedPointer<Slider> durationSlider;
-    ScopedPointer<ComboBox> stepComboBox;
-    ScopedPointer<Label> nameLabel;
-    ScopedPointer<Slider> offsetSlider;
-    ScopedPointer<Slider> exponentSlider;
-    ScopedPointer<ToggleButton> chopperToggle;
-    ScopedPointer<TextButton> textButton;
 
 
     //==============================================================================
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (StepSequencerComponent)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DimensionChorusComponent)
 };
 
 //[EndFile] You can add extra defines here...
 //[/EndFile]
 
-#endif   // __JUCE_HEADER_95E50ED86F3D9A4C__
+#endif   // __JUCE_HEADER_E2DCC5129BDB47A2__

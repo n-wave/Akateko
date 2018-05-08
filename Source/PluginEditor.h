@@ -24,6 +24,8 @@
 #include "JuceHeader.h"
 #include "PluginProcessor.h"
 
+#include "/work/programming-projects/msm/msm-utilities/ConfigurationFileManager.h"
+#include "/work/programming-projects/msm/msm-dsp/Common/BeatDivisor.h"
 #include "/work/programming-projects/msm/msm-gui/FilterDisplay.h"
 #include "/work/programming-projects/msm/msm-gui/QTableDrawing.h"
 #include "/work/programming-projects/msm/msm-gui/ParamSlider.h"
@@ -32,13 +34,17 @@
 #include "/work/programming-projects/msm/msm-gui/NumberBox.h"
 #include "/work/programming-projects/msm/msm-gui/XYPad.h"
 
+#include "AkatekoMatrix.h"
 #include "LFOComponent.h"
 #include "EnvelopeComponent.h"
 #include "StepSequencerComponent.h"
 #include "WaveShapeComponent.h"
 #include "FilterComponent.h"
-#include "ModulationMatrixComponent.h"
+#include "MatrixTable.h"
+#include "FXContainer.h"
+#include "PresetComponent.h"
 
+#include "Akateko.h"
 //[/Headers]
 
 
@@ -68,9 +74,11 @@ public:
         ENV1,
         ENV2,
         SSEQ,
-        MODM
+        MODM,
+        PRST
     };
 
+    void setEffectParameterDestinations(StringArray &params, int effect);
     //[/UserMethods]
 
     void paint (Graphics& g) override;
@@ -79,12 +87,11 @@ public:
     void visibilityChanged() override;
     void handleCommandMessage (int commandId) override;
 
-
+    void updateGui();
 
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
     void initialiseDisplayLabel();
-    void initialisePreAmpSection();
     void initialiseModulationContainer();
     void initialiseEffectContainer();
     void initialiseToolBarSection();
@@ -92,7 +99,10 @@ private:
     /* Call after AudioProcessrParameters() */
     void hideModulationComponent(int modComponentId);
 
-    Label label;
+    BeatDivisor beatDivisor; //Used For LFO's
+
+    Label presetLabel;
+    Label paramLabel;
     AkatekoAudioProcessor &processor;
 
     ScopedPointer<LFOComponent> lfoOne;
@@ -100,24 +110,27 @@ private:
     ScopedPointer<EnvelopeComponent> envOne;
     ScopedPointer<EnvelopeComponent> envTwo;
     ScopedPointer<StepSequencerComponent> stepSeq;
-    ScopedPointer<ModulationMatrixComponent> modMatrix;
+    ScopedPointer<PresetComponent> preset;
 
     /* Test Values for binding XYPad remove later */
-    double xAxis;
-    double yAxis;
 
+
+    double currentBPM;
     int activeModulation;
+
+    int xyPadCommandId;
+    int effectOneCommandId;
+    int effectTwoCommandId;
+    int presetCommandId;
 
     Colour buttonColour;
     Colour activeColour;
+
+    Image backGroundImage;
     //[/UserVariables]
 
     //==============================================================================
-    ScopedPointer<Slider> preDriveSlider;
-    ScopedPointer<Slider> preAmplitudeSlider;
-    ScopedPointer<ToggleButton> preToggleButton;
     ScopedPointer<TextButton> lfoOneButton;
-    ScopedPointer<ToggleButton> effectToggleButton;
     ScopedPointer<TextButton> lfoTwoButton;
     ScopedPointer<TextButton> envOneButton;
     ScopedPointer<TextButton> envTwoButton;
@@ -125,13 +138,14 @@ private:
     ScopedPointer<TextButton> modulationButton;
     ScopedPointer<TextButton> loadPresetButton;
     ScopedPointer<TextButton> savePresetButton;
-    ScopedPointer<Slider> mainVolumeSlider;
-    ScopedPointer<ToggleButton> bypassToggle;
+    ScopedPointer<Slider> InputVolumeSlider;
     ScopedPointer<WaveShapeComponent> waveShaper;
     ScopedPointer<FilterComponent> filter;
     ScopedPointer<XYPad> xyPad;
-
-
+    ScopedPointer<MatrixTable> modMatrix;
+    ScopedPointer<FXContainer> fxContainer;
+    ScopedPointer<Slider> mainVolumeSlider;
+    ScopedPointer<TextButton> presetButton;
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AkatekoAudioProcessorEditor)
 };

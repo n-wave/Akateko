@@ -23,8 +23,8 @@ public:
 
     void setSampleRate(double sampleRate);
     void update();
-    void getSample(double *sample);
-    void getSample(float *sample);
+
+    double getSample(double input);
 
     void enableFilters(bool enable);
     void filterConfiguration(int config);
@@ -35,6 +35,7 @@ public:
     void setFilterOnePassBand(double passBand);
     void setFilterOneFrequency(double frequency);
     void setFilterOneResonance(double resonance);
+    void setFilterOneVolume(double volume);
     void setFilterOneType(int type);
 
     // Filter Two
@@ -43,6 +44,7 @@ public:
     void setFilterTwoPassBand(double passBand);
     void setFilterTwoFrequency(double frequency);
     void setFilterTwoResonance(double resonance);
+    void setFilterTwoVolume(double volume);
     void setFilterTwoType(int type);
 
     // WaveShaper
@@ -55,12 +57,18 @@ private:
     MoogLadderFilter filterTwo;
     WaveShaper waveShaper;
 
+    const double &fOneVol;
+    const double &fTwoVol;
+
     bool filtersEnabled;
     int filterConfig;
 
     bool filterOneEnabled;
     bool filterTwoEnabled;
     bool waveShaperEnabled;
+
+    double filterOneVolume;
+    double filterTwoVolume;
 };
 
 #endif  // AKATEKOVOICE_H_INCLUDED

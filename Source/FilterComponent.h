@@ -55,6 +55,8 @@ public:
     //==============================================================================
     //[UserMethods]     -- You can add your own custom methods in this section.
 
+    void updateGui();
+
     enum ParameterId {
         FilterEnable,
         FilterConfig,
@@ -77,9 +79,6 @@ public:
     void comboBoxChanged (ComboBox* comboBoxThatHasChanged) override;
     void buttonClicked (Button* buttonThatWasClicked) override;
     void handleCommandMessage (int commandId) override;
-    void focusOfChildComponentChanged (FocusChangeType cause) override;
-
-
 
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
@@ -88,14 +87,19 @@ private:
 
     void initialiseFilterOne();
     void initialiseFilterTwo();
-    
+
     AkatekoAudioProcessor &processor;
     Label &labelRef;
+
+    AudioProcessorParameter *filterOnePassBand;
+    AudioProcessorParameter *filterOneVolume;
+
+    AudioProcessorParameter *filterTwoPassBand;
+    AudioProcessorParameter *filterTwoVolume;
+
     //[/UserVariables]
 
     //==============================================================================
-    ScopedPointer<Slider> filterOneFrequencySlider;
-    ScopedPointer<Slider> filterOneResonanceSlider;
     ScopedPointer<Slider> filterTwoFrequencySlider;
     ScopedPointer<Slider> filterTwoResonanceSlider;
     ScopedPointer<FilterDisplay> filterDisplay;
@@ -107,6 +111,14 @@ private:
     ScopedPointer<ToggleButton> filterOneToggleButton;
     ScopedPointer<ToggleButton> filterTwoToggleButton;
     ScopedPointer<ComboBox> filterConfigComboBox;
+    ScopedPointer<Slider> filterTwoDriveSlider;
+    ScopedPointer<Slider> filterTwoPassBandSlider;
+    ScopedPointer<Slider> filterTwoVolumeSlider;
+    ScopedPointer<Slider> filterOneFrequencySlider;
+    ScopedPointer<Slider> filterOneResonanceSlider;
+    ScopedPointer<Slider> filterOneDriveSlider;
+    ScopedPointer<Slider> filterOnePassBandSlider;
+    ScopedPointer<Slider> filterOneVolumeSlider;
 
 
     //==============================================================================

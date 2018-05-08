@@ -18,11 +18,13 @@
 */
 
 //[Headers] You can add your own extra header files here...
+#include "Akateko.h"
+
+using namespace akateko;
 //[/Headers]
 
 #include "PluginEditor.h"
 
-using namespace std::placeholders;
 
 //[MiscUserDefs] You can add your own user definitions and misc code here...
 
@@ -36,28 +38,29 @@ AkatekoAudioProcessorEditor::AkatekoAudioProcessorEditor (AkatekoAudioProcessor&
     buttonColour = Colour(0x73707070);
     activeColour = Colour(0x7f007f7f);
 
-    addAndMakeVisible(filter = new FilterComponent("Filter", processor, label));
-    addAndMakeVisible(waveShaper = new WaveShapeComponent("WaveShape", processor, label));
+    effectOneCommandId = 0;
+    effectTwoCommandId = 0;
+
+    addAndMakeVisible(filter = new FilterComponent("Filter", processor, paramLabel));
+    addAndMakeVisible(waveShaper = new WaveShapeComponent("WaveShape", processor, paramLabel));
+
+    addAndMakeVisible (xyPad = new XYPad(paramLabel,
+                                         processor.getModMatrix().getWriteRegister(MODSRC::PADX),
+                                         processor.getModMatrix().getWriteRegister(MODSRC::PADY)));
+
+    String tmpXYPad = String("XYPAD");
+    xyPadCommandId = tmpXYPad.hashCode(); //Create Identifier
+    xyPad->setName(tmpXYPad);
+    xyPad->setUpdateCommandId(xyPadCommandId);
 
     this->initialiseDisplayLabel();
-    this->initialisePreAmpSection();
+    this->initialiseEffectContainer();
     this->initialiseModulationContainer();
 
-    addAndMakeVisible (xyPad = new XYPad(label, xAxis, yAxis));
-    xyPad->setName ("XY Pad : ");
-
-    /*
-     *
-     *     extern const char*   hexagonpattern_png;
-    const int            hexagonpattern_pngSize = 44063;
-     */
-
     //[/Constructor_pre]
-
     //[UserPreSize]
-    addAndMakeVisible (effectToggleButton = new ToggleButton ("effectToggle"));
-    effectToggleButton->setButtonText (String());
 
+    // Preset Buttons
     addAndMakeVisible (loadPresetButton = new TextButton ("savePresetButton"));
     loadPresetButton->setButtonText (TRANS("load"));
     loadPresetButton->addListener (this);
@@ -72,14 +75,16 @@ AkatekoAudioProcessorEditor::AkatekoAudioProcessorEditor (AkatekoAudioProcessor&
     savePresetButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
     savePresetButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
+    // Main Volume Sliders
+    addAndMakeVisible (InputVolumeSlider = new Slider ("Input"));
+    InputVolumeSlider->setRange (0.01, 2, 0);
+    InputVolumeSlider->setSliderStyle (Slider::RotaryVerticalDrag);
+    InputVolumeSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
+
     addAndMakeVisible (mainVolumeSlider = new Slider ("mainVolume"));
     mainVolumeSlider->setRange (-1, 1, 0.001);
     mainVolumeSlider->setSliderStyle (Slider::RotaryVerticalDrag);
     mainVolumeSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
-
-    addAndMakeVisible (bypassToggle = new ToggleButton ("bypassToggle"));
-    bypassToggle->setButtonText (String());
-    bypassToggle->setToggleState (true, dontSendNotification);
 
     //[/UserPreSize]
 
@@ -88,7 +93,15 @@ AkatekoAudioProcessorEditor::AkatekoAudioProcessorEditor (AkatekoAudioProcessor&
 
     //[Constructor] You can add your own custom stuff here..
 
-    //this->bindAudioProcessorParameters();
+    //Restore XY Pad Values
+    if(processor.shapesInitialised()){
+        xyPad->restoreFromString(processor.getUIState(AkatekoAudioProcessor::xyPadId));
+    }
+
+    // Set Labels
+    presetLabel.setText("Akateko", sendNotificationSync);
+    paramLabel.setText("Ready", sendNotificationSync);
+
     //[/Constructor]
 }
 
@@ -99,11 +112,7 @@ AkatekoAudioProcessorEditor::~AkatekoAudioProcessorEditor()
     //save states to the processor should be the very first thing to be called
     //[/Destructor_pre]
 
-    preDriveSlider = nullptr;
-    preAmplitudeSlider = nullptr;
-    preToggleButton = nullptr;
     lfoOneButton = nullptr;
-    effectToggleButton = nullptr;
     lfoTwoButton = nullptr;
     envOneButton = nullptr;
     envTwoButton = nullptr;
@@ -111,11 +120,14 @@ AkatekoAudioProcessorEditor::~AkatekoAudioProcessorEditor()
     modulationButton = nullptr;
     loadPresetButton = nullptr;
     savePresetButton = nullptr;
-    mainVolumeSlider = nullptr;
-    bypassToggle = nullptr;
+    InputVolumeSlider = nullptr;
     waveShaper = nullptr;
     filter = nullptr;
     xyPad = nullptr;
+    modMatrix = nullptr;
+    fxContainer = nullptr;
+    mainVolumeSlider = nullptr;
+    presetButton = nullptr;
 
 
     //[Destructor]. You can add your own custom destruction code here..
@@ -150,16 +162,10 @@ void AkatekoAudioProcessorEditor::paint (Graphics& g)
     g.fillRoundedRectangle (5.0f, 60.0f, 885.0f, 265.0f, 4.000f);
 
     g.setColour (Colour (0xff323232));
-    g.fillRoundedRectangle (10.0f, 65.0f, 80.0f, 255.0f, 2.000f);
+    g.fillRoundedRectangle (10.0f, 65.0f, 345.0f, 255.0f, 2.000f);
 
     g.setColour (Colours::black);
-    g.drawRoundedRectangle (10.0f, 65.0f, 80.0f, 255.0f, 2.000f, 2.000f);
-
-    g.setColour (Colour (0xff323232));
-    g.fillRoundedRectangle (100.0f, 65.0f, 255.0f, 255.0f, 2.000f);
-
-    g.setColour (Colours::black);
-    g.drawRoundedRectangle (100.0f, 65.0f, 255.0f, 255.0f, 2.000f, 2.000f);
+    g.drawRoundedRectangle (10.0f, 65.0f, 345.0f, 255.0f, 2.000f, 2.000f);
 
     g.setColour (Colour (0xff323232));
     g.fillRoundedRectangle (365.0f, 65.0f, 255.0f, 255.0f, 2.000f);
@@ -174,16 +180,10 @@ void AkatekoAudioProcessorEditor::paint (Graphics& g)
     g.drawRoundedRectangle (630.0f, 65.0f, 255.0f, 255.0f, 2.000f, 2.000f);
 
     g.setColour (Colour (0xff323232));
-    g.fillRoundedRectangle (10.0f, 335.0f, 80.0f, 255.0f, 2.000f);
+    g.fillRoundedRectangle (10.0f, 335.0f, 610.0f, 255.0f, 2.000f);
 
     g.setColour (Colours::black);
-    g.drawRoundedRectangle (10.0f, 335.0f, 80.0f, 255.0f, 2.000f, 2.000f);
-
-    g.setColour (Colour (0xff323232));
-    g.fillRoundedRectangle (100.0f, 335.0f, 520.0f, 255.0f, 2.000f);
-
-    g.setColour (Colours::black);
-    g.drawRoundedRectangle (100.0f, 335.0f, 520.0f, 255.0f, 2.000f, 2.000f);
+    g.drawRoundedRectangle (10.0f, 335.0f, 610.0f, 255.0f, 2.000f, 2.000f);
 
     g.setColour (Colour (0xff323232));
     g.fillRoundedRectangle (630.0f, 335.0f, 255.0f, 255.0f, 2.000f);
@@ -198,67 +198,13 @@ void AkatekoAudioProcessorEditor::paint (Graphics& g)
                                        false));
     g.setFont (Font ("Good Times", 46.00f, Font::plain));
     g.drawText (TRANS("AKATEKO"),
-                10, 16, 258, 30,
-                Justification::centred, true);
-
-    g.setColour (Colour (0xffaaaaaa));
-    g.setFont (Font ("Good Times", 16.00f, Font::plain));
-    g.drawText (TRANS("PRE"),
-                17, 67, 67, 21,
+                50, 16, 258, 33,
                 Justification::centred, true);
 
     g.setColour (Colour (0xffaaaaaa));
     g.setFont (Font ("Good Times", 16.00f, Font::plain));
     g.drawText (TRANS("WAVESHAPER"),
                 377, 67, 141, 21,
-                Justification::centred, true);
-
-    g.setColour (Colour (0xffaaaaaa));
-    g.setFont (Font ("Good Times", 16.00f, Font::plain));
-    g.drawText (TRANS("FX"),
-                647, 67, 33, 21,
-                Justification::centred, true);
-
-    g.setColour (Colour (0xffaaaaaa));
-    g.setFont (Font ("Good Times", 12.00f, Font::plain));
-    g.drawText (TRANS("AMP"),
-                13, 293, 57, 21,
-                Justification::centred, true);
-
-    g.setColour (Colour (0xffaaaaaa));
-    g.setFont (Font ("Good Times", 12.00f, Font::plain));
-    g.drawText (TRANS("DRIVE"),
-                21, 181, 57, 21,
-                Justification::centred, true);
-
-    g.setColour (Colour (0xffaaaaaa));
-    g.setFont (Font ("Good Times", 16.00f, Font::plain));
-    g.drawText (TRANS("FILTER"),
-                113, 67, 73, 21,
-                Justification::centred, true);
-
-    g.setColour (Colour (0xffaaaaaa));
-    g.setFont (Font ("Good Times", 12.00f, Font::plain));
-    g.drawText (TRANS("FREQ"),
-                103, 299, 57, 21,
-                Justification::centred, true);
-
-    g.setColour (Colour (0xffaaaaaa));
-    g.setFont (Font ("Good Times", 12.00f, Font::plain));
-    g.drawText (TRANS("Q"),
-                167, 299, 19, 21,
-                Justification::centred, true);
-
-    g.setColour (Colour (0xffaaaaaa));
-    g.setFont (Font ("Good Times", 12.00f, Font::plain));
-    g.drawText (TRANS("FREQ"),
-                231, 299, 57, 21,
-                Justification::centred, true);
-
-    g.setColour (Colour (0xffaaaaaa));
-    g.setFont (Font ("Good Times", 12.00f, Font::plain));
-    g.drawText (TRANS("Q"),
-                303, 299, 19, 21,
                 Justification::centred, true);
 
     //[UserPaint] Add your own custom painting code here..
@@ -271,33 +217,34 @@ void AkatekoAudioProcessorEditor::resized()
     //waveShaper->setBounds (365, 65, 255, 255);
     //[/UserPreResize]
 
-    preDriveSlider->setBounds (12, 112, 75, 75);
-    preAmplitudeSlider->setBounds (12, 216, 75, 75);
-    preToggleButton->setBounds (12, 64, 24, 24);
-    lfoOneButton->setBounds (15, 340, 70, 30);
-    effectToggleButton->setBounds (632, 64, 24, 24);
-    lfoTwoButton->setBounds (16, 370, 70, 30);
-    envOneButton->setBounds (16, 400, 70, 30);
-    envTwoButton->setBounds (16, 430, 70, 30);
-    stepButton->setBounds (16, 460, 70, 30);
-    modulationButton->setBounds (16, 490, 70, 30);
-    loadPresetButton->setBounds (768, 8, 40, 20);
-    savePresetButton->setBounds (768, 32, 40, 20);
-    mainVolumeSlider->setBounds (816, 8, 50, 50);
-    bypassToggle->setBounds (864, 32, 24, 24);
+    lfoOneButton->setBounds (24, 352, 70, 30);
+    lfoTwoButton->setBounds (24, 384, 70, 30);
+    envOneButton->setBounds (24, 416, 70, 30);
+    envTwoButton->setBounds (24, 448, 70, 30);
+    stepButton->setBounds (24, 480, 70, 30);
+    modulationButton->setBounds (24, 512, 70, 30);
+    loadPresetButton->setBounds (320, 8, 32, 20);
+    savePresetButton->setBounds (320, 32, 32, 20);
+    InputVolumeSlider->setBounds (10, 11, 40, 40);
     waveShaper->setBounds (365, 65, 255, 255);
-    filter->setBounds (100, 65, 255, 255);
-    xyPad->setBounds (635, 340, 245, 245);
+    filter->setBounds (10, 65, 345, 255);
+    xyPad->setBounds (635, 340, 246, 246);
+    modMatrix->setBounds (108, 343, 505, 240);
+    fxContainer->setBounds (630, 65, 255, 255);
+    mainVolumeSlider->setBounds (844, 11, 40, 40);
+    presetButton->setBounds (24, 544, 70, 30);
     //[UserResized] Add your own custom resize handling here..
 
+    presetLabel.setBounds (368, 9, 248, 18);
+    paramLabel.setBounds (368, 33, 248, 18);
+
+    modMatrix->initialiseHeader(505, 240);
     lfoOne->setBounds(102, 338, 515, 250);
     lfoTwo->setBounds(102, 338, 515, 250);
     envOne->setBounds(102, 338, 515, 250);
     envTwo->setBounds(102, 338, 515, 250);
     stepSeq->setBounds(102, 338, 515, 250);
-    modMatrix->setBounds(102, 338, 515, 250);
-
-    label.setBounds (630, 10, 145, 40);
+    preset->setBounds(102, 338, 515, 250);
 
     /* Set Image after resize for proper, gradient positioning */
     const Image tmpBackGround = ImageCache::getFromMemory(BinaryData::hexagonpattern_png, BinaryData::hexagonpattern_pngSize);
@@ -373,16 +320,41 @@ void AkatekoAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
         this->repaint();
         //[/UserButtonCode_modulationButton]
     }
+    else if (buttonThatWasClicked == presetButton)
+    {
+        //[UserButtonCode_presetButton] -- add your button handler code here..
+        hideModulationComponent(activeModulation);
+        activeModulation = PRST;
+        presetButton->setColour(TextButton::buttonColourId, activeColour);
+        preset->setVisible(true);
+        this->repaint();
+        //[/UserButtonCode_presetButton]
+    }
     else if (buttonThatWasClicked == loadPresetButton)
     {
         //[UserButtonCode_loadPresetButton] -- add your button handler code here..
+        processor.load();
+        updateGui();
         //[/UserButtonCode_loadPresetButton]
     }
     else if (buttonThatWasClicked == savePresetButton)
     {
         //[UserButtonCode_savePresetButton] -- add your button handler code here..
+        processor.setShapes(waveShaper->getCurrentShapes(),AkatekoAudioProcessor::WaveShapeId);
+        processor.setShapes(lfoOne->getCurrentShapes(),AkatekoAudioProcessor::LFO1Id);
+        processor.setShapes(lfoTwo->getCurrentShapes(),AkatekoAudioProcessor::LFO2Id);
+        processor.setUIState(envOne->getUIState(), AkatekoAudioProcessor::Envelope1Id);
+        processor.setUIState(envTwo->getUIState(), AkatekoAudioProcessor::Envelope2Id);
+        processor.setUIState(stepSeq->getUIState(), AkatekoAudioProcessor::StepSequencerId);
+        processor.setUIState(xyPad->toString(), AkatekoAudioProcessor::xyPadId);
+        processor.setUIState(fxContainer->getUIState(), AkatekoAudioProcessor::FxContainerId);
+       // processor.setUIState(stepSeq->getUIState(), AkatekoAudioProcessor::StepSequencerId);
+
+
+        processor.save();
         //[/UserButtonCode_savePresetButton]
     }
+
 
     //[UserbuttonClicked_Post]
     //[/UserbuttonClicked_Post]
@@ -398,22 +370,43 @@ void AkatekoAudioProcessorEditor::handleCommandMessage (int commandId)
 {
     //[UserCode_handleCommandMessage] -- Add your code here...
 
+    if(commandId == effectOneCommandId){
+        int effectOne = fxContainer->getActiveEffectProcessor(1);
+        modMatrix->setEffectsDestination(effectOne, 1);
+    } else if(commandId == effectTwoCommandId){
+        int effectTwo = fxContainer->getActiveEffectProcessor(2);
+        modMatrix->setEffectsDestination(effectTwo, 2);
+    } else if(commandId == xyPadCommandId){
+        processor.setUIState(xyPad->toString(), AkatekoAudioProcessor::xyPadId);
+    } else if(commandId == presetCommandId){
+        updateGui();
 
+        const String tmpPresetName = processor.getCurrentPresetName();
+        presetLabel.setText(tmpPresetName, sendNotificationSync);
+    }
     //[/UserCode_handleCommandMessage]
 }
-
-
 
 //[MiscUserCode] You can add your own definitions of your custom methods or any other code here...
 
 void AkatekoAudioProcessorEditor::initialiseDisplayLabel(){
-    addAndMakeVisible (&label);
-    label.setFont (Font (13.00f, Font::plain));
-    label.setJustificationType (Justification::centredLeft);
-    label.setEditable (false, false, false);
-    label.setColour (Label::backgroundColourId, Colour (0xffb4b4b4));
-    label.setColour (TextEditor::textColourId, Colours::black);
-    label.setColour (TextEditor::backgroundColourId, Colour (0x00000000));
+    addAndMakeVisible(&presetLabel);
+    presetLabel.setFont (Font (15.00f, Font::plain));
+    presetLabel.setJustificationType (Justification::centredLeft);
+    presetLabel.setEditable (false, false, false);
+    presetLabel.setColour (Label::backgroundColourId, Colour (0x7f2d0000));
+    presetLabel.setColour (Label::textColourId, Colour (0xffdfdfdf));
+    presetLabel.setColour (TextEditor::textColourId, Colours::black);
+    presetLabel.setColour (TextEditor::backgroundColourId, Colour (0x00000000));
+
+    addAndMakeVisible (&paramLabel);
+    paramLabel.setFont (Font (15.00f, Font::plain));
+    paramLabel.setJustificationType (Justification::centredLeft);
+    paramLabel.setEditable (false, false, false);
+    paramLabel.setColour (Label::backgroundColourId, Colour (0x7f2d0000));
+    paramLabel.setColour (Label::textColourId, Colour (0xffdfdfdf));
+    paramLabel.setColour (TextEditor::textColourId, Colours::black);
+    paramLabel.setColour (TextEditor::backgroundColourId, Colour (0x00000000));
 }
 
 /*
@@ -422,42 +415,8 @@ void AkatekoAudioProcessorEditor::initialiseDisplayLabel(){
  * preAmpDrive  : ParamID = "PRDR"
  */
 
-void AkatekoAudioProcessorEditor::initialisePreAmpSection(){
-    vector<int> paramIndices = processor.getParameterIndices(AkatekoAudioProcessor::PreAmpId);
-    StringArray paramName = processor.getParameterIds(AkatekoAudioProcessor::PreAmpId);
-    int nrOfParameters = paramIndices.size();
-
-    if(nrOfParameters == 3){
-        addAndMakeVisible(preToggleButton = new ParamToggle (paramName[0],
-                                                            *processor.getParameters().getUnchecked(paramIndices[0]),
-                                                            label));
-
-        addAndMakeVisible (preDriveSlider = new ParamSlider (paramName[1],
-                                                             *processor.getParameters().getUnchecked(paramIndices[1]),
-                                                             label));
-
-        addAndMakeVisible (preAmplitudeSlider = new ParamSlider (paramName[2],
-                                                                 *processor.getParameters().getUnchecked(paramIndices[2]),
-                                                                 label));
-    } else {
-        addAndMakeVisible(preToggleButton = new ToggleButton("Pre"));
-        addAndMakeVisible (preDriveSlider = new Slider ("preDrive"));
-        addAndMakeVisible (preAmplitudeSlider = new Slider ("preAmplitude"));
-
-        std::cerr << "AkatekoAudioProcessorEditor::initialisePreAmpSection" << std::endl;
-        std::cerr << "/---------------Parameters not bound---------------/" << std::endl;
-    }
-
-    preDriveSlider->setRange (0, 1, 0.001);
-    preDriveSlider->setSliderStyle (Slider::RotaryHorizontalDrag);
-    preDriveSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
-
-    preAmplitudeSlider->setRange (0, 1, 0.001);
-    preAmplitudeSlider->setSliderStyle (Slider::RotaryHorizontalDrag);
-    preAmplitudeSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
-}
-
 void AkatekoAudioProcessorEditor::initialiseModulationContainer(){
+    // LFO One Button
     addAndMakeVisible (lfoOneButton = new TextButton ("lfoOne"));
     lfoOneButton->setButtonText (TRANS("LFO 1"));
     lfoOneButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
@@ -465,7 +424,7 @@ void AkatekoAudioProcessorEditor::initialiseModulationContainer(){
     lfoOneButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
     lfoOneButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
     lfoOneButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
-
+    // LFO Two Button
     addAndMakeVisible (lfoTwoButton = new TextButton ("lfoTwo"));
     lfoTwoButton->setButtonText (TRANS("LFO 2"));
     lfoTwoButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
@@ -473,7 +432,7 @@ void AkatekoAudioProcessorEditor::initialiseModulationContainer(){
     lfoTwoButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
     lfoTwoButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
     lfoTwoButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
-
+    // ENV One Button
     addAndMakeVisible (envOneButton = new TextButton ("envOneButton"));
     envOneButton->setButtonText (TRANS("ENV 1"));
     envOneButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
@@ -481,7 +440,7 @@ void AkatekoAudioProcessorEditor::initialiseModulationContainer(){
     envOneButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
     envOneButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
     envOneButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
-
+    // ENV Two Button
     addAndMakeVisible (envTwoButton = new TextButton ("envTwo"));
     envTwoButton->setButtonText (TRANS("ENV 2"));
     envTwoButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
@@ -489,7 +448,7 @@ void AkatekoAudioProcessorEditor::initialiseModulationContainer(){
     envTwoButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
     envTwoButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
     envTwoButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
-
+    // Step Button
     addAndMakeVisible (stepButton = new TextButton ("stepButton"));
     stepButton->setButtonText (TRANS("STEP"));
     stepButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
@@ -497,7 +456,7 @@ void AkatekoAudioProcessorEditor::initialiseModulationContainer(){
     stepButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
     stepButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
     stepButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
-
+    // Modulation Button
     addAndMakeVisible (modulationButton = new TextButton ("modButton"));
     modulationButton->setButtonText (TRANS("MOD"));
     modulationButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
@@ -505,15 +464,50 @@ void AkatekoAudioProcessorEditor::initialiseModulationContainer(){
     modulationButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
     modulationButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
     modulationButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
+    // Preset Button
+    addAndMakeVisible (presetButton = new TextButton ("preset"));
+    presetButton->setButtonText (TRANS("PRESET"));
+    presetButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
+    presetButton->addListener (this);
+    presetButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
+    presetButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
+    presetButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
-    /* Gather Parameters and ParamIds */    
+    currentBPM = processor.getBPM();
+    beatDivisor.calculateBeatDivisions(currentBPM);
+    /* Gather Parameters and ParamIds */
+    addChildComponent(lfoOne = new LFOComponent("LFO 1", processor, 1, paramLabel));
+    lfoOne->setBeatDivisionStrings(beatDivisor.getStringArray());
+    lfoOne->setBeatDivisionValues(beatDivisor.getValues());
+    lfoOne->initFrequencySlider();
 
-    addChildComponent(lfoOne = new LFOComponent("LFO 1", processor, 1, label));
-    addChildComponent(lfoTwo = new LFOComponent("LFO 1", processor, 2, label));
-    addChildComponent(envOne = new EnvelopeComponent("ENV 1", processor, 1, label));
-    addChildComponent(envTwo = new EnvelopeComponent("ENV 2", processor, 2, label));
-    addChildComponent(stepSeq = new StepSequencerComponent("SSEQ", processor, label));
-    addChildComponent(modMatrix = new ModulationMatrixComponent(processor.getModMatrix()));
+    addChildComponent(lfoTwo = new LFOComponent("LFO 2", processor, 2, paramLabel));
+    lfoTwo->setBeatDivisionStrings(beatDivisor.getStringArray());
+    lfoTwo->setBeatDivisionValues(beatDivisor.getValues());
+    lfoTwo->initFrequencySlider();
+
+    addChildComponent(envOne = new EnvelopeComponent("ENV 1", processor, 1, paramLabel));
+    envOne->setBeatDivisionStrings(beatDivisor.getStringArray());
+    envOne->setBeatDivisionValues(beatDivisor.getValues());
+    envOne->initDurationSlider();
+
+    addChildComponent(envTwo = new EnvelopeComponent("ENV 2", processor, 2, paramLabel));
+    envTwo->setBeatDivisionStrings(beatDivisor.getStringArray());
+    envTwo->setBeatDivisionValues(beatDivisor.getValues());
+    envTwo->initDurationSlider();
+
+    addChildComponent(stepSeq = new StepSequencerComponent("SSEQ", processor, paramLabel));
+
+    addChildComponent(modMatrix = new MatrixTable(processor.getModMatrix()));
+    modMatrix->setColour(TableListBox::backgroundColourId, Colours::black);
+
+    // Preset Component
+    addChildComponent(preset = new PresetComponent("Presets", processor, presetLabel, paramLabel));
+    // Generate Hash Code
+    const String tmpPresetId = String(preset->getName()) + String(":gui");
+    presetCommandId = tmpPresetId.hashCode();
+    preset->setUpdateCommandId(presetCommandId);
+
 
     lfoOne->setVisible(true);
     activeModulation = LFO1;
@@ -547,11 +541,23 @@ void AkatekoAudioProcessorEditor::initialiseModulationContainer(){
 
        stepSeq->setUIState(processor.getUIState(AkatekoAudioProcessor::StepSequencerId));
        waveShaper->setCurrentShapes(processor.getShapes(AkatekoAudioProcessor::WaveShapeId));
+     //  xyPad->restoreFromString(processor.getUIState(AkatekoAudioProcessor::xyPadId));
     }
 }
 
 void AkatekoAudioProcessorEditor::initialiseEffectContainer(){
+    String name = String("FX : ");
+    String fxOneUpdateId = name + String("Update 1");
+    String fxTwoUpdateId = name + String("Update 2");
 
+    effectOneCommandId = fxOneUpdateId.hash();
+    effectTwoCommandId = fxTwoUpdateId.hash();
+
+    addAndMakeVisible (fxContainer = new FXContainer (name, processor, paramLabel));
+
+
+    fxContainer->setEffectOneUpdateId(effectOneCommandId);
+    fxContainer->setEffectTwoUpdateId(effectTwoCommandId);
 }
 
 void AkatekoAudioProcessorEditor::initialiseToolBarSection(){
@@ -596,10 +602,43 @@ void AkatekoAudioProcessorEditor::hideModulationComponent(int modComponentId){
             modulationButton->setColour(TextButton::buttonColourId, buttonColour);
             modMatrix->setVisible(false);
             break;
+        case PRST:
+            presetButton->setColour(TextButton::buttonColourId, buttonColour);
+            preset->setVisible(false);
+            break;
     }
     this->repaint();
 }
 
+/* When a preset is loaded update the whole
+ * Graphical User interface.
+ */
+
+void AkatekoAudioProcessorEditor::updateGui(){
+    //Retrieve Shapes Stored as String Arrays
+    waveShaper->setCurrentShapes(processor.getShapes(AkatekoAudioProcessor::WaveShapeId));
+    lfoOne->setCurrentShapes(processor.getShapes(AkatekoAudioProcessor::LFO1Id));
+    lfoTwo->setCurrentShapes(processor.getShapes(AkatekoAudioProcessor::LFO2Id));
+    envOne->setUIState(processor.getUIState(AkatekoAudioProcessor::Envelope1Id));
+    envTwo->setUIState(processor.getUIState(AkatekoAudioProcessor::Envelope2Id));
+    stepSeq->setUIState(processor.getUIState(AkatekoAudioProcessor::StepSequencerId));
+    xyPad->restoreFromString(processor.getUIState(AkatekoAudioProcessor::xyPadId));
+    fxContainer->setUITState(processor.getUIState(AkatekoAudioProcessor::FxContainerId));
+
+    //After loading update all gui components
+    filter->updateGui();
+    waveShaper->updateGui();
+    lfoOne->updateGui();
+    lfoTwo->updateGui();
+
+    envOne->updateGui();
+    envTwo->updateGui();
+    stepSeq->updateGui();
+    fxContainer->updateGui();
+
+    modMatrix->updateGui();
+
+}
 
 //[/MiscUserCode]
 
@@ -627,112 +666,93 @@ BEGIN_JUCER_METADATA
     <ROUNDRECT pos="5 5 885 50" cornerSize="4" fill="solid: ff323232" hasStroke="0"/>
     <ROUNDRECT pos="5 330 885 265" cornerSize="4" fill="solid: ff4e4e4e" hasStroke="0"/>
     <ROUNDRECT pos="5 60 885 265" cornerSize="4" fill="solid: ff4e4e4e" hasStroke="0"/>
-    <ROUNDRECT pos="10 65 80 255" cornerSize="2" fill="solid: ff323232" hasStroke="1"
-               stroke="2, mitered, butt" strokeColour="solid: ff000000"/>
-    <ROUNDRECT pos="100 65 255 255" cornerSize="2" fill="solid: ff323232" hasStroke="1"
+    <ROUNDRECT pos="10 65 345 255" cornerSize="2" fill="solid: ff323232" hasStroke="1"
                stroke="2, mitered, butt" strokeColour="solid: ff000000"/>
     <ROUNDRECT pos="365 65 255 255" cornerSize="2" fill="solid: ff323232" hasStroke="1"
                stroke="2, mitered, butt" strokeColour="solid: ff000000"/>
     <ROUNDRECT pos="630 65 255 255" cornerSize="2" fill="solid: ff323232" hasStroke="1"
                stroke="2, mitered, butt" strokeColour="solid: ff000000"/>
-    <ROUNDRECT pos="10 335 80 255" cornerSize="2" fill="solid: ff323232" hasStroke="1"
-               stroke="2, mitered, butt" strokeColour="solid: ff000000"/>
-    <ROUNDRECT pos="100 335 520 255" cornerSize="2" fill="solid: ff323232" hasStroke="1"
+    <ROUNDRECT pos="10 335 610 255" cornerSize="2" fill="solid: ff323232" hasStroke="1"
                stroke="2, mitered, butt" strokeColour="solid: ff000000"/>
     <ROUNDRECT pos="630 335 255 255" cornerSize="2" fill="solid: ff323232" hasStroke="1"
                stroke="2, mitered, butt" strokeColour="solid: ff000000"/>
-    <TEXT pos="10 16 258 30" fill="linear: 88 16, 88 64, 0=ff6f6d6d, 1=ffffffff"
+    <TEXT pos="50 16 258 33" fill="linear: 88 16, 88 64, 0=ff6f6d6d, 1=ffffffff"
           hasStroke="0" text="AKATEKO" fontname="Good Times" fontsize="46"
           bold="0" italic="0" justification="36"/>
-    <TEXT pos="17 67 67 21" fill="solid: ffaaaaaa" hasStroke="0" text="PRE"
-          fontname="Good Times" fontsize="16" bold="0" italic="0" justification="36"/>
     <TEXT pos="377 67 141 21" fill="solid: ffaaaaaa" hasStroke="0" text="WAVESHAPER"
           fontname="Good Times" fontsize="16" bold="0" italic="0" justification="36"/>
-    <TEXT pos="647 67 33 21" fill="solid: ffaaaaaa" hasStroke="0" text="FX"
-          fontname="Good Times" fontsize="16" bold="0" italic="0" justification="36"/>
-    <TEXT pos="13 293 57 21" fill="solid: ffaaaaaa" hasStroke="0" text="AMP"
-          fontname="Good Times" fontsize="12" bold="0" italic="0" justification="36"/>
-    <TEXT pos="21 181 57 21" fill="solid: ffaaaaaa" hasStroke="0" text="DRIVE"
-          fontname="Good Times" fontsize="12" bold="0" italic="0" justification="36"/>
-    <TEXT pos="113 67 73 21" fill="solid: ffaaaaaa" hasStroke="0" text="FILTER"
-          fontname="Good Times" fontsize="16" bold="0" italic="0" justification="36"/>
-    <TEXT pos="103 299 57 21" fill="solid: ffaaaaaa" hasStroke="0" text="FREQ"
-          fontname="Good Times" fontsize="12" bold="0" italic="0" justification="36"/>
-    <TEXT pos="167 299 19 21" fill="solid: ffaaaaaa" hasStroke="0" text="Q"
-          fontname="Good Times" fontsize="12" bold="0" italic="0" justification="36"/>
-    <TEXT pos="231 299 57 21" fill="solid: ffaaaaaa" hasStroke="0" text="FREQ"
-          fontname="Good Times" fontsize="12" bold="0" italic="0" justification="36"/>
-    <TEXT pos="303 299 19 21" fill="solid: ffaaaaaa" hasStroke="0" text="Q"
-          fontname="Good Times" fontsize="12" bold="0" italic="0" justification="36"/>
   </BACKGROUND>
-  <SLIDER name="preDrive" id="c7d5b2ed0904b42b" memberName="preDriveSlider"
-          virtualName="Slider" explicitFocusOrder="0" pos="12 112 75 75"
-          min="0" max="1" int="0.0010000000000000000208" style="RotaryVerticalDrag"
-          textBoxPos="NoTextBox" textBoxEditable="0" textBoxWidth="80"
-          textBoxHeight="20" skewFactor="1" needsCallback="0"/>
-  <SLIDER name="preAmplitude" id="d05f9a7eb4a16aef" memberName="preAmplitudeSlider"
-          virtualName="Slider" explicitFocusOrder="0" pos="12 216 75 75"
-          min="0" max="1" int="0.0010000000000000000208" style="RotaryVerticalDrag"
-          textBoxPos="NoTextBox" textBoxEditable="0" textBoxWidth="80"
-          textBoxHeight="20" skewFactor="1" needsCallback="0"/>
-  <TOGGLEBUTTON name="pretoggle" id="af1a37888fa46c92" memberName="preToggleButton"
-                virtualName="ToggleButton" explicitFocusOrder="0" pos="12 64 24 24"
-                buttonText="" connectedEdges="0" needsCallback="0" radioGroupId="0"
-                state="0"/>
   <TEXTBUTTON name="lfoOne" id="3be90a7d038cacae" memberName="lfoOneButton"
-              virtualName="" explicitFocusOrder="0" pos="15 340 70 30" bgColOff="73707070"
+              virtualName="" explicitFocusOrder="0" pos="24 352 70 30" bgColOff="73707070"
               bgColOn="ff464646" textCol="fff0f0f0" buttonText="LFO 1" connectedEdges="12"
               needsCallback="1" radioGroupId="0"/>
-  <TOGGLEBUTTON name="effectToggle" id="f99ec011c2a826e1" memberName="effectToggleButton"
-                virtualName="ToggleButton" explicitFocusOrder="0" pos="632 64 24 24"
-                buttonText="" connectedEdges="0" needsCallback="0" radioGroupId="0"
-                state="0"/>
   <TEXTBUTTON name="lfoTwo" id="8a5cdd3b15902e28" memberName="lfoTwoButton"
-              virtualName="" explicitFocusOrder="0" pos="16 370 70 30" bgColOff="73707070"
+              virtualName="" explicitFocusOrder="0" pos="24 384 70 30" bgColOff="73707070"
               bgColOn="ff464646" textCol="fff0f0f0" buttonText="LFO 2" connectedEdges="12"
               needsCallback="1" radioGroupId="0"/>
   <TEXTBUTTON name="envOneButton" id="bdaf7e11ea200503" memberName="envOneButton"
-              virtualName="" explicitFocusOrder="0" pos="16 400 70 30" bgColOff="73707070"
+              virtualName="" explicitFocusOrder="0" pos="24 416 70 30" bgColOff="73707070"
               bgColOn="ff464646" textCol="fff0f0f0" buttonText="ENV 1" connectedEdges="12"
               needsCallback="1" radioGroupId="0"/>
   <TEXTBUTTON name="envTwo" id="18bd76a767b49aa8" memberName="envTwoButton"
-              virtualName="" explicitFocusOrder="0" pos="16 430 70 30" bgColOff="73707070"
+              virtualName="" explicitFocusOrder="0" pos="24 448 70 30" bgColOff="73707070"
               bgColOn="ff464646" textCol="fff0f0f0" buttonText="ENV 2" connectedEdges="12"
               needsCallback="1" radioGroupId="0"/>
   <TEXTBUTTON name="stepButton" id="161d2f193b2d1e9c" memberName="stepButton"
-              virtualName="" explicitFocusOrder="0" pos="16 460 70 30" bgColOff="73707070"
+              virtualName="" explicitFocusOrder="0" pos="24 480 70 30" bgColOff="73707070"
               bgColOn="ff464646" textCol="fff0f0f0" buttonText="STEP" connectedEdges="12"
               needsCallback="1" radioGroupId="0"/>
   <TEXTBUTTON name="modButton" id="411aa6c03fa5468d" memberName="modulationButton"
-              virtualName="" explicitFocusOrder="0" pos="16 490 70 30" bgColOff="73707070"
+              virtualName="" explicitFocusOrder="0" pos="24 512 70 30" bgColOff="73707070"
               bgColOn="ff464646" textCol="fff0f0f0" buttonText="MOD" connectedEdges="12"
               needsCallback="1" radioGroupId="0"/>
   <TEXTBUTTON name="savePresetButton" id="2a6f9b9c2a0b2c96" memberName="loadPresetButton"
-              virtualName="" explicitFocusOrder="0" pos="768 8 40 20" bgColOff="73707070"
-              bgColOn="ff464646" textCol="fff0f0f0" buttonText="load" connectedEdges="0"
+              virtualName="" explicitFocusOrder="0" pos="320 8 32 20" bgColOff="73707070"
+              bgColOn="ff464646" textCol="fff0f0f0" buttonText="load" connectedEdges="3"
               needsCallback="1" radioGroupId="0"/>
   <TEXTBUTTON name="new button" id="48fac67238ae71fe" memberName="savePresetButton"
-              virtualName="" explicitFocusOrder="0" pos="768 32 40 20" bgColOff="73707070"
-              bgColOn="ff464646" textCol="fff0f0f0" buttonText="save" connectedEdges="0"
+              virtualName="" explicitFocusOrder="0" pos="320 32 32 20" bgColOff="73707070"
+              bgColOn="ff464646" textCol="fff0f0f0" buttonText="save" connectedEdges="3"
               needsCallback="1" radioGroupId="0"/>
-  <SLIDER name="mainVolume" id="6336a7102808882a" memberName="mainVolumeSlider"
-          virtualName="Slider" explicitFocusOrder="0" pos="816 8 50 50"
-          min="-1" max="1" int="0.0010000000000000000208" style="RotaryVerticalDrag"
+  <SLIDER name="Input" id="6336a7102808882a" memberName="InputVolumeSlider"
+          virtualName="Slider" explicitFocusOrder="0" pos="10 11 40 40"
+          min="0.010000000000000000208" max="2" int="0" style="RotaryVerticalDrag"
           textBoxPos="NoTextBox" textBoxEditable="0" textBoxWidth="80"
           textBoxHeight="20" skewFactor="1" needsCallback="0"/>
-  <TOGGLEBUTTON name="bypassToggle" id="39a689422aa8782c" memberName="bypassToggle"
-                virtualName="ToggleButton" explicitFocusOrder="0" pos="864 32 24 24"
-                buttonText="" connectedEdges="0" needsCallback="0" radioGroupId="0"
-                state="1"/>
   <GENERICCOMPONENT name="waveShaper" id="97d7ede6e23b1658" memberName="waveShaper"
                     virtualName="WaveShapeComponent" explicitFocusOrder="0" pos="365 65 255 255"
                     class="Component" params="&quot;WSHP&quot;"/>
   <GENERICCOMPONENT name="filter" id="db18492e2bda189" memberName="filter" virtualName="FilterComponent"
-                    explicitFocusOrder="0" pos="100 65 255 255" class="Component"
+                    explicitFocusOrder="0" pos="10 65 345 255" class="Component"
                     params="&quot;FILT&quot;"/>
-  <GENERICCOMPONENT name="xyPad" id="fc769d97819c849c" memberName="XY Pad : " virtualName="XYPad"
+  <GENERICCOMPONENT name="xyPad" id="fc769d97819c849c" memberName="xyPad" virtualName="XYPad"
                     explicitFocusOrder="0" pos="635 340 246 246" class="Component"
                     params=""/>
+  <GENERICCOMPONENT name="Modulation Matrix" id="4d30054a30547bdc" memberName="modMatrix"
+                    virtualName="MatrixTable" explicitFocusOrder="0" pos="108 343 505 240"
+                    class="Component" params="ModulationMatrix &amp;modm"/>
+  <GENERICCOMPONENT name="fxContainer" id="741f651e1a422402" memberName="fxContainer"
+                    virtualName="FXContainer" explicitFocusOrder="0" pos="630 65 255 255"
+                    class="Component" params="&quot;FX Container&quot;"/>
+  <SLIDER name="mainVolume" id="7b235f0e952fd646" memberName="mainVolumeSlider"
+          virtualName="Slider" explicitFocusOrder="0" pos="844 11 40 40"
+          min="0.010000000000000000208" max="2" int="0" style="RotaryVerticalDrag"
+          textBoxPos="NoTextBox" textBoxEditable="0" textBoxWidth="80"
+          textBoxHeight="20" skewFactor="1" needsCallback="0"/>
+  <TEXTBUTTON name="preset" id="6d9d037c6aab172b" memberName="presetButton"
+              virtualName="" explicitFocusOrder="0" pos="24 544 70 30" bgColOff="73707070"
+              bgColOn="ff464646" textCol="fff0f0f0" buttonText="PRESET" connectedEdges="12"
+              needsCallback="1" radioGroupId="0"/>
+  <LABEL name="presetLabel" id="ef58931134b9d2d8" memberName="presetLabel"
+         virtualName="" explicitFocusOrder="0" pos="368 9 248 18" bkgCol="7f2d0000"
+         textCol="ffdfdfdf" edTextCol="ff000000" edBkgCol="0" labelText="Preset Name &#10;"
+         editableSingleClick="0" editableDoubleClick="0" focusDiscardsChanges="0"
+         fontname="Default font" fontsize="15" bold="0" italic="0" justification="33"/>
+  <LABEL name="paramLabel" id="7331442217f9d85d" memberName="paramLabel"
+         virtualName="" explicitFocusOrder="0" pos="368 33 248 18" bkgCol="7f2d0000"
+         textCol="ffdfdfdf" edTextCol="ff000000" edBkgCol="0" labelText="Params&#10;"
+         editableSingleClick="0" editableDoubleClick="0" focusDiscardsChanges="0"
+         fontname="Default font" fontsize="15" bold="0" italic="0" justification="33"/>
 </JUCER_COMPONENT>
 
 END_JUCER_METADATA

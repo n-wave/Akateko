@@ -17,13 +17,16 @@
   ==============================================================================
 */
 
-#ifndef __JUCE_HEADER_7932748FC001F0E8__
-#define __JUCE_HEADER_7932748FC001F0E8__
+#ifndef __JUCE_HEADER_30E3BB3F047E521E__
+#define __JUCE_HEADER_30E3BB3F047E521E__
 
 //[Headers]     -- You can add your own extra header files here --
 #include "../JuceLibraryCode/JuceHeader.h"
-#include "/work/programming-projects/msm/msm-dsp/Common/ModulationMatrix.h"
-#include "MatrixTable.h"
+#include "PluginProcessor.h"
+
+#include "/work/programming-projects/msm/msm-gui/ParamSlider.h"
+#include "/work/programming-projects/msm/msm-gui/ParamToggle.h"
+#include <vector>
 //[/Headers]
 
 
@@ -34,43 +37,55 @@
     An auto-generated component, created by the Projucer.
 
     Describe your class and how it works here!
-
-    Probably remove when finishing the matrix table.
-    use the Matrix table directly.
-
                                                                     //[/Comments]
 */
-class ModulationMatrixComponent  : public Component
+class DecimatorComponent  : public Component,
+                            public SliderListener
 {
 public:
     //==============================================================================
-    ModulationMatrixComponent (ModulationMatrix &modm);
-    ~ModulationMatrixComponent();
+    DecimatorComponent (const String &name, AkatekoAudioProcessor &p, Label &label);
+    ~DecimatorComponent();
 
     //==============================================================================
     //[UserMethods]     -- You can add your own custom methods in this section.
+    enum commandIds{
+        update
+    };
+
     void handleCommandMessage(int commandId) override;
     //[/UserMethods]
 
     void paint (Graphics& g) override;
     void resized() override;
+    void sliderValueChanged (Slider* sliderThatWasMoved) override;
 
 
 
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
-    ModulationMatrix &matrix;
+    AkatekoAudioProcessor &processor;
+    Label &labelRef;
+
+    AudioProcessorParameter *bitReduction;
+    AudioProcessorParameter *srateReduction;
     //[/UserVariables]
 
     //==============================================================================
-    ScopedPointer<MatrixTable> matrixTable;
+    ScopedPointer<Slider> rateSlider;
+    ScopedPointer<Slider> bitSlider;
+    ScopedPointer<Slider> mixSlider;
+    ScopedPointer<ToggleButton> enableToggle;
+    ScopedPointer<ToggleButton> filterToggle;
+    ScopedPointer<ToggleButton> reduceEnable;
+    ScopedPointer<ToggleButton> srateEnable;
 
 
     //==============================================================================
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ModulationMatrixComponent)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DecimatorComponent)
 };
 
 //[EndFile] You can add extra defines here...
 //[/EndFile]
 
-#endif   // __JUCE_HEADER_7932748FC001F0E8__
+#endif   // __JUCE_HEADER_30E3BB3F047E521E__

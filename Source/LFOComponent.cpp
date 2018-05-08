@@ -23,7 +23,7 @@
 
 #include "LFOComponent.h"
 
-using std::vector;
+
 //[MiscUserDefs] You can add your own user definitions and misc code here...
 /*
  *   int commandUpdate;
@@ -33,20 +33,19 @@ using std::vector;
 //[/MiscUserDefs]
 
 //==============================================================================
-
-LFOComponent::LFOComponent (const String &name, AkatekoAudioProcessor &p, int lfo, Label &label) :
-    Component::Component(name),
-    processor(p),
-    defaultShape(false),
-    activeShape(nullptr),
-    oneShot(nullptr),
-    sync(nullptr),
-    lfoNumber(0),
-    buttonColour(Colour(0x73707070)),
-    activeColour(Colour(0x7f007f7f)),
-    labelRef(label)
+LFOComponent::LFOComponent (const String &name, AkatekoAudioProcessor &p, int lfo, Label &label)
+    : Component::Component(name),
+      processor(p),
+      defaultShape(false),
+      activeShape(nullptr),
+      oneShot(nullptr),
+      sync(nullptr),
+      lfoNumber(0),
+      buttonColour(Colour(0x73707070)),
+      activeColour(Colour(0x7f007f7f)),
+      labelRef(label)
 {
-    //[Constructor_pre]
+    //[Constructor_pre] You can add your own custom stuff here..
     vector<int> paramIndices;
     StringArray paramNames;
     bool proceed = false;
@@ -89,10 +88,13 @@ LFOComponent::LFOComponent (const String &name, AkatekoAudioProcessor &p, int lf
         addAndMakeVisible (lfoEnableToggle = new ParamToggle (paramNames[0], *p.getParameters().getUnchecked(paramIndices[0]), label)); //LFO Enable
         oneShot = p.getParameters().getUnchecked(paramIndices[1]);  //LFO OneShot
         sync = p.getParameters().getUnchecked(paramIndices[2]); //LFO Sync
-        addAndMakeVisible (lfoFrequencySlider = new ParamSlider (paramNames[3], *p.getParameters().getUnchecked(paramIndices[3]) , label , 0.001, 20.0)); //LFO Frequency
+        frequency = p.getParameters().getUnchecked(paramIndices[3]); //Frequency
+
+        addAndMakeVisible (lfoFrequencySlider = new Slider(paramNames[3])); //LFO Frequency
         addAndMakeVisible (lfoPhaseSlider = new ParamSlider (paramNames[4], *p.getParameters().getUnchecked(paramIndices[4]), label)); //LFO Phase
         addAndMakeVisible (lfoPWMSlider = new ParamSlider (paramNames[5], *p.getParameters().getUnchecked(paramIndices[5]), label, -1.f, 1.f)); //LFO PWM
         activeShape = p.getParameters().getUnchecked(paramIndices[6]);
+
 
     } else {
         addAndMakeVisible (lfoEnableToggle = new ToggleButton ("lfoEnableToggle"));
@@ -155,7 +157,7 @@ LFOComponent::LFOComponent (const String &name, AkatekoAudioProcessor &p, int lf
 
     /* Buttons*/
 
-    addAndMakeVisible (shapeButtonOne = new TextButton ("shapeButtonOne"));
+    addAndMakeVisible (shapeButtonOne = new TextButton ("Shape one"));
     shapeButtonOne->setButtonText (TRANS("1"));
     shapeButtonOne->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     shapeButtonOne->addListener (this);
@@ -163,7 +165,7 @@ LFOComponent::LFOComponent (const String &name, AkatekoAudioProcessor &p, int lf
     shapeButtonOne->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
     shapeButtonOne->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
-    addAndMakeVisible (shapeButtonTwo = new TextButton ("shapeButtonTwo"));
+    addAndMakeVisible (shapeButtonTwo = new TextButton ("Shape two"));
     shapeButtonTwo->setButtonText (TRANS("2"));
     shapeButtonTwo->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     shapeButtonTwo->addListener (this);
@@ -171,7 +173,7 @@ LFOComponent::LFOComponent (const String &name, AkatekoAudioProcessor &p, int lf
     shapeButtonTwo->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
     shapeButtonTwo->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
-    addAndMakeVisible (shapeButtonThree = new TextButton ("shapeButtonThree"));
+    addAndMakeVisible (shapeButtonThree = new TextButton ("Shape three"));
     shapeButtonThree->setButtonText (TRANS("3"));
     shapeButtonThree->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     shapeButtonThree->addListener (this);
@@ -179,7 +181,7 @@ LFOComponent::LFOComponent (const String &name, AkatekoAudioProcessor &p, int lf
     shapeButtonThree->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
     shapeButtonThree->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
-    addAndMakeVisible (shapeButtonFour = new TextButton ("shapeButtonFour"));
+    addAndMakeVisible (shapeButtonFour = new TextButton ("Shape four"));
     shapeButtonFour->setButtonText (TRANS("4"));
     shapeButtonFour->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     shapeButtonFour->addListener (this);
@@ -187,7 +189,7 @@ LFOComponent::LFOComponent (const String &name, AkatekoAudioProcessor &p, int lf
     shapeButtonFour->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
     shapeButtonFour->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
-    addAndMakeVisible (shapeButtonFive = new TextButton ("shapeButtonFive"));
+    addAndMakeVisible (shapeButtonFive = new TextButton ("Shape five"));
     shapeButtonFive->setButtonText (TRANS("5"));
     shapeButtonFive->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     shapeButtonFive->addListener (this);
@@ -195,7 +197,7 @@ LFOComponent::LFOComponent (const String &name, AkatekoAudioProcessor &p, int lf
     shapeButtonFive->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
     shapeButtonFive->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
-    addAndMakeVisible (shapeButtonSix = new TextButton ("shapeButtonSix"));
+    addAndMakeVisible (shapeButtonSix = new TextButton ("Shape six"));
     shapeButtonSix->setButtonText (TRANS("6"));
     shapeButtonSix->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     shapeButtonSix->addListener (this);
@@ -203,7 +205,7 @@ LFOComponent::LFOComponent (const String &name, AkatekoAudioProcessor &p, int lf
     shapeButtonSix->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
     shapeButtonSix->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
-    addAndMakeVisible (shapeButtonSeven = new TextButton ("shapeButtonSeven"));
+    addAndMakeVisible (shapeButtonSeven = new TextButton ("Shape seven"));
     shapeButtonSeven->setButtonText (TRANS("7"));
     shapeButtonSeven->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     shapeButtonSeven->addListener (this);
@@ -211,7 +213,7 @@ LFOComponent::LFOComponent (const String &name, AkatekoAudioProcessor &p, int lf
     shapeButtonSeven->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
     shapeButtonSeven->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
-    addAndMakeVisible (shapeButtonEight = new TextButton ("shapeButtonEight"));
+    addAndMakeVisible (shapeButtonEight = new TextButton ("Shape eight"));
     shapeButtonEight->setButtonText (TRANS("8"));
     shapeButtonEight->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     shapeButtonEight->addListener (this);
@@ -337,17 +339,20 @@ LFOComponent::LFOComponent (const String &name, AkatekoAudioProcessor &p, int lf
         }
     }
 
-    if(sync != nullptr){
+    if(sync != nullptr && frequency != nullptr){
         const bool tmpSync = sync->getValue();
 
-        if(sync != nullptr){
-            syncButton->setColour(TextButton::buttonColourId, activeColour);
-            freeRunningButton->setColour(TextButton::buttonColourId, buttonColour);
-        } else {
+        if(!tmpSync && frequency){
+            lfoFrequencySlider->setRange(0.0001, 20.0);
             syncButton->setColour(TextButton::buttonColourId, buttonColour);
             freeRunningButton->setColour(TextButton::buttonColourId, activeColour);
+        } else {
+            lfoFrequencySlider->setRange(0, 23, 1);
+            syncButton->setColour(TextButton::buttonColourId, activeColour);
+            freeRunningButton->setColour(TextButton::buttonColourId, buttonColour);
         }
     }
+
     //[/Constructor]
 }
 
@@ -382,6 +387,7 @@ LFOComponent::~LFOComponent()
 
 
     //[Destructor]. You can add your own custom destruction code here..
+    frequency = nullptr;
     activeShape = nullptr;
     oneShot = nullptr;
     sync = nullptr;
@@ -461,7 +467,6 @@ void LFOComponent::resized()
     //[/UserResized]
 }
 
-
 void LFOComponent::sliderValueChanged (Slider* sliderThatWasMoved)
 {
     //[UsersliderValueChanged_Pre]
@@ -476,6 +481,32 @@ void LFOComponent::sliderValueChanged (Slider* sliderThatWasMoved)
     else if (sliderThatWasMoved == lfoFrequencySlider)
     {
         //[UserSliderCode_lfoFrequencySlider] -- add your slider handling code here..
+        String tmpName = lfoFrequencySlider->getName();
+
+        const bool tmpSync = sync->getValue();
+
+        if(tmpSync){
+            int tmpVal = lfoFrequencySlider->getValue();
+
+            if(tmpVal < beatDivision.size() &&
+               tmpVal < valueBeatDivision.size())
+            {
+                float tmpFreq = 1.0/(valueBeatDivision[tmpVal]*0.001);
+                tmpName += beatDivision[tmpVal];
+
+                //std::cout << "LFOComponent::lfoFrequency, slider Value : " << tmpFreq << std::endl;
+
+                frequency->setValue(tmpFreq);
+
+                //std::cout << "LFOComponent::lfoFrequency, Parameter value : " << tmpFreq << std::endl;
+            }
+        } else {
+            double tmpVal = lfoFrequencySlider->getValue();
+            frequency->setValue(tmpVal);
+            tmpName += String(tmpVal, 2);
+        }
+
+        labelRef.setText(tmpName, dontSendNotification);
         //[/UserSliderCode_lfoFrequencySlider]
     }
     else if (sliderThatWasMoved == lfoPWMSlider)
@@ -653,9 +684,6 @@ void LFOComponent::buttonClicked (Button* buttonThatWasClicked)
             } else {
                 oneShotButton->setColour(TextButton::buttonColourId, buttonColour);
             }
-
-
-
         }
 
         //[/UserButtonCode_oneShotButton]
@@ -667,17 +695,61 @@ void LFOComponent::buttonClicked (Button* buttonThatWasClicked)
             sync->setValue(false);
             syncButton->setColour(TextButton::buttonColourId, buttonColour);
             freeRunningButton->setColour(TextButton::buttonColourId, activeColour);
+        } else {
+            std::cerr << "Sync parameter not bound properly" << std::endl;
         }
+
+        lfoFrequencySlider->setRange(0.0001, 20.0);
+
+        if(lfoNumber == 1){
+            processor.setLowFreqOscOneBounds(0.0001, 20.0);
+        } else if(lfoNumber == 2){
+            processor.setLowFreqOscTwoBounds(0.0001, 20.0);
+        }
+
+        if(frequency != nullptr){
+            double tmpFreq = frequency->getValue();
+            lfoFrequencySlider->setValue(tmpFreq, sendNotificationAsync);
+        } else {
+            std::cerr << "Frequency parameter not bound properly" << std::endl;
+        }
+
         //[/UserButtonCode_freeRunningButton]
     }
     else if (buttonThatWasClicked == syncButton)
     {
-        //[UserButtonCode_syncButton] -- add your button handler code here..]
-        if(sync != nullptr){
+        //[UserButtonCode_syncButton] -- add your button handler code here..
+        if(sync != nullptr && frequency != nullptr){
             sync->setValue(true);
             syncButton->setColour(TextButton::buttonColourId, activeColour);
             freeRunningButton->setColour(TextButton::buttonColourId, buttonColour);
+
+            double tmpFreq = frequency->getValue();
+            int tmpIndex =  findClosestTimeDivision(tmpFreq);
+
+            tmpFreq = 1/(valueBeatDivision[tmpIndex]*0.001);
+            frequency->setValue(tmpFreq);
+
+            lfoFrequencySlider->setRange(0, 23, 1);
+            lfoFrequencySlider->setValue(tmpIndex);
+
+            const double minFreq = 1.0/(valueBeatDivision[0]*0.001);
+            const double maxFreq = 1.0/(valueBeatDivision[valueBeatDivision.size()-1]*0.001);
+
+
+            std::cout << "StepSeq start Freq : " << minFreq << std::endl;
+            std::cout << "StepSeq end Freq" << maxFreq << std::endl;
+
+            if(lfoNumber == 1){
+                processor.setLowFreqOscOneBounds(minFreq, maxFreq);
+            } else if(lfoNumber == 2){
+                processor.setLowFreqOscTwoBounds(minFreq, maxFreq);
+            }
+        } else {
+            std::cerr << "Parameters are not bounded properly" << std::endl;
         }
+
+        // Change sliderSetting
         //[/UserButtonCode_syncButton]
     }
 
@@ -834,7 +906,7 @@ void LFOComponent::setShape(Button *buttonThatWasClicked, int shape){
 
             activeShape->setValue(shape);
 
-            String tmpString = getName() + String(" : Shape one");
+            String tmpString = getName() + " : " +buttonThatWasClicked->getName();
             labelRef.setText(tmpString, dontSendNotification);
         }
 
@@ -846,6 +918,184 @@ void LFOComponent::setShape(Button *buttonThatWasClicked, int shape){
             processor.updateShape(currentShapes[shape], AkatekoAudioProcessor::LFO2Id);
         }
     }
+}
+
+void LFOComponent::setBeatDivisionStrings(StringArray beatDivStr){
+    beatDivision.swapWith(beatDivStr);
+}
+
+void LFOComponent::setBeatDivisionValues(std::vector<double> beatDivVal){
+    valueBeatDivision.swap(beatDivVal);
+}
+
+/* Call for setting the Beat divisions */
+void LFOComponent::initFrequencySlider(){
+    if(sync != nullptr &&
+       frequency != nullptr &&
+       beatDivision.size() != 0 &&
+       valueBeatDivision.size() != 0)
+    {
+        const bool tmpSync = sync->getValue();
+            double freq = frequency->getValue();
+        if(tmpSync){
+            int tmpIndex = findClosestTimeDivision(freq);
+
+            lfoFrequencySlider->setValue(tmpIndex, dontSendNotification);
+        } else {
+            lfoFrequencySlider->setValue(freq, dontSendNotification);
+        }
+    } else {
+        if(sync == nullptr || frequency == nullptr){
+            std::cerr << "Parameters bound not properly : " << getName() << std::endl;
+        }
+
+        if(beatDivision.size() == 0 || valueBeatDivision.size() == 0){
+            std::cerr << "Beat Divisor tables not set properly" << std::endl;
+        }
+    }
+}
+
+
+int LFOComponent::findClosestTimeDivision(double freq){
+    double tmpPeriod = 0.0;
+    int result = 0;
+
+    //std::cout << "LFOComponent::findClosestTimeDivision, freq : " << freq << std::endl;
+
+    if(freq != 0){
+        bool run = true;
+        int nrOfSteps = valueBeatDivision.size();
+        tmpPeriod= (1.0/freq)*1000;
+
+        //std::cout << "LFOComponent::findClosestTimeDivision, period : " << tmpPeriod << std::endl;
+
+        if(nrOfSteps != 0){
+            bool run = true;
+            int halvation = nrOfSteps*0.5;
+            int index = 1;
+
+            if(tmpPeriod <= valueBeatDivision[nrOfSteps-1]){
+                run = false;
+                result = nrOfSteps-1;
+            }
+
+            while(run && index < nrOfSteps-1){
+                double prev = valueBeatDivision[index-1];
+                double val = valueBeatDivision[index];
+                double next = valueBeatDivision[index+1];
+
+                if(val == tmpPeriod){
+                    result = index;
+                    run = false;
+                }
+
+                if(prev >= tmpPeriod && val < tmpPeriod){
+                    result = index-1;
+                    run = false;
+                }
+
+                if(val > tmpPeriod && next <= tmpPeriod){
+                    result = index+1;
+                    run = false;
+                }
+
+                index +=3;
+            }
+        }
+    }
+    return result;
+}
+
+// Call When A preset is loaded
+
+void LFOComponent::updateGui(){
+    lfoEnableToggle->postCommandMessage(ParamToggle::update);
+    lfoPhaseSlider->postCommandMessage(ParamSlider::update);
+    lfoPWMSlider->postCommandMessage(ParamSlider::update);
+
+    // Shape Buttons
+    if(activeShape != nullptr){
+        int sIndex = activeShape->getValue();
+
+        // Reset All Shapes
+        for(int i=0; i<8; i++){
+            resetShapButtonColour(i);
+        }
+
+        switch(sIndex){
+            case 0:
+                shapeButtonOne->setColour(TextButton::buttonColourId, activeColour);
+                break;
+            case 1:
+                shapeButtonTwo->setColour(TextButton::buttonColourId, activeColour);
+                break;
+            case 2:
+                shapeButtonThree->setColour(TextButton::buttonColourId, activeColour);
+                break;
+            case 3:
+                shapeButtonFour->setColour(TextButton::buttonColourId, activeColour);
+                break;
+            case 4:
+                shapeButtonFive->setColour(TextButton::buttonColourId, activeColour);
+                break;
+            case 5:
+                shapeButtonSix->setColour(TextButton::buttonColourId, activeColour);
+                break;
+            case 6:
+                shapeButtonSeven->setColour(TextButton::buttonColourId, activeColour);
+                break;
+            case 7:
+                shapeButtonEight->setColour(TextButton::buttonColourId, activeColour);
+                break;
+            default:
+                std::cerr << "LFOComponent::updateGui" << std::endl;
+                std::cerr << "Wrong Shape Number supplied" << std::endl;
+        }
+
+        if(sIndex < currentShapes.size()){
+            LFO->restoreFromString(currentShapes[sIndex]);
+            LFO->fillBuffer();
+            currentBuffer = LFO->getBuffer();
+            bufferDisplay->setBuffer(currentBuffer);
+
+            if(lfoNumber == 1){
+                processor.setLowFreqOscOneBuffer(currentBuffer);
+            } else if(lfoNumber == 2){
+                processor.setLowFreqOscTwoBuffer(currentBuffer);
+            }
+        }
+
+    }
+
+
+
+    // Set One Shot Button
+    if(oneShot != nullptr){
+        const bool tmpOneShot = oneShot->getValue();
+
+        if(tmpOneShot){
+            oneShotButton->setColour(TextButton::buttonColourId, activeColour);
+        } else {
+            oneShotButton->setColour(TextButton::buttonColourId, buttonColour);
+        }
+    }
+
+    // Set Sync and Frequency Slider
+    if(sync != nullptr && frequency != nullptr){
+        const bool tmpSync = sync->getValue();
+
+        if(!tmpSync && frequency){
+            lfoFrequencySlider->setRange(0.0001, 20.0);
+            syncButton->setColour(TextButton::buttonColourId, buttonColour);
+            freeRunningButton->setColour(TextButton::buttonColourId, activeColour);
+        } else {
+            lfoFrequencySlider->setRange(0, 23, 1);
+            syncButton->setColour(TextButton::buttonColourId, activeColour);
+            freeRunningButton->setColour(TextButton::buttonColourId, buttonColour);
+        }
+    }
+
+    initFrequencySlider();
 }
 
 //[/MiscUserCode]
@@ -861,8 +1111,8 @@ void LFOComponent::setShape(Button *buttonThatWasClicked, int shape){
 BEGIN_JUCER_METADATA
 
 <JUCER_COMPONENT documentType="Component" className="LFOComponent" componentName=""
-                 parentClasses="public Component" constructorParams="const String &amp;name, const OwnedArray&lt;AudioProcessorParameter&gt; &amp;pArray,const StringArray &amp;paramIds, Label &amp;label"
-                 variableInitialisers="Component::Component(name)&#10;defaultShape(false)&#10;commandUpdate(-1)&#10;commandReset(-1)&#10;overlayWidth(0.0)&#10;overlayHeight(0.0)&#10;overlayXPos(0.0)&#10;overlayYPos(0.0)&#10;      labelRef(label)"
+                 parentClasses="public Component" constructorParams="const String &amp;name, AkatekoAudioProcessor &amp;p, int lfo, Label &amp;label"
+                 variableInitialisers="Component::Component(name)&#10;processor(p)&#10;defaultShape(false)&#10;activeShape(nullptr)&#10;oneShot(nullptr)&#10;sync(nullptr)&#10;lfoNumber(0) buttonColour(Colour(0x73707070)) activeColour(Colour(0x7f007f7f))&#10;labelRef(label)"
                  snapPixels="8" snapActive="1" snapShown="1" overlayOpacity="0.330"
                  fixedSize="1" initialWidth="515" initialHeight="250">
   <METHODS>

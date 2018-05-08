@@ -25,6 +25,8 @@ MatrixTable::MatrixTable(ModulationMatrix &modm) :
     activeColumn(-1),
     cellWidth(0.f),
     cellHeight(0.f),
+    fxOneStartIndex(22),
+    fxTwoStartIndex(23),
     textColour(Colours::lightgrey)
 {   
     rowIsActive.resize(numRows, false);
@@ -53,7 +55,6 @@ MatrixTable::MatrixTable(ModulationMatrix &modm) :
         }
     }
 
-
     sources.add("LFO One");
     sources.add("LFO Two");
     sources.add("ENV One");
@@ -65,28 +66,84 @@ MatrixTable::MatrixTable(ModulationMatrix &modm) :
     transform.add("unipolar");
     transform.add("bipolar");
 
-    destination.add("PRE Drive");           // Index 0
-    destination.add("PRE Amount");          // Index 1
-    destination.add("F1 Frequency");        // Index 2
-    destination.add("F1 Resonance");        // Index 3
-    destination.add("F2 Frequency");        // Index 4
-    destination.add("F2 Resonance");        // Index 5
-    destination.add("WS Drive");            // Index 6
-    destination.add("WS Mix");              // Index 7
-    destination.add("WS Amplitude");        // Index 8
-    destination.add("WS Routing");          // Index 9
-    destination.add("LFO1 Frequency");      // Index 10
-    destination.add("LFO1 Phase");          // Index 11
-    destination.add("LFO1 PWM");            // Index 12
-    destination.add("LFO2 Frequency");      // Index 13
-    destination.add("LFO2 Phase");          // Index 14
-    destination.add("LFO2 PWM");            // Index 15
-    destination.add("ENV1 Duration");       // Index 16
-    destination.add("ENV2 Duration");       // Index 17
-    destination.add("SSEQ duration");       // Index 18
-    destination.add("SSEQ Length");         // Index 19
-    destination.add("SSEQ Offset");         // Index 20
-    destination.add("SSEQ Curve");          // Index 21
+    destination.add("F1 Freq");             // Index 0
+    destination.add("F1 Reso");             // Index 1
+    destination.add("F1 P-Band");           // Index 2
+    destination.add("F1 Drive");            // Index 3
+    destination.add("F1 Volume");           // Index 4
+
+    destination.add("F2 Freq");             // Index 5
+    destination.add("F2 Reso");             // Index 6
+    destination.add("F2 P-Band");           // Index 7
+    destination.add("F2 Drive");            // Index 8
+    destination.add("F2 Volume");           // Index 9
+
+    destination.add("WS Drive");            // Index 10
+    destination.add("WS Mix");              // Index 11
+
+    destination.add("LFO1 Freq");           // Index 12
+    destination.add("LFO1 Phase");          // Index 13
+    destination.add("LFO1 PWM");            // Index 14
+    destination.add("LFO2 Freq");           // Index 15
+    destination.add("LFO2 Phase");          // Index 16
+    destination.add("LFO2 PWM");            // Index 17
+
+    destination.add("ENV1 Dura");           // Index 18
+    destination.add("ENV2 Dura");           // Index 19
+
+    destination.add("SSEQ Dura");           // Index 20
+    destination.add("SSEQ Length");         // Index 21
+    destination.add("SSEQ Offset");         // Index 22
+    destination.add("SDEL Cross");          // Index 23
+
+    destination.add("SDEL Mix");            // Index 24
+    destination.add("SDEL L-Delay");        // Index 25
+    destination.add("SDEL L-FB");           // Index 26
+    destination.add("SDEL R-Delay");        // Index 27
+    destination.add("SDEL R-FB");           // Index 28
+
+    destination.add("PP L-Delay");          // Index 29
+    destination.add("PP L-FB");             // Index 30
+    destination.add("PP L-Mix");            // Index 31
+    destination.add("PP R-Delay");          // Index 32
+    destination.add("PP R-FN");             // Index 33
+    destination.add("PP R-Mix");            // Index 34
+
+    destination.add("LCR L-Delay");         // Index 35
+    destination.add("LCR L-FB");            // Index 36
+    destination.add("LCR L-Mix");           // Index 37
+    destination.add("LCR C-Delay");         // Index 38
+    destination.add("LCR C-FB");            // Index 39
+    destination.add("LCR HPF F");           // Index 40
+    destination.add("LCR LPF F");           // Index 41
+    destination.add("LCR Amp");             // Index 42
+    destination.add("LCR Pan");             // Index 43
+    destination.add("LCR R-Delay");         // Index 44
+    destination.add("LCR R-FB");            // Index 45
+    destination.add("LCR R-Mix");           // Index 46
+    destination.add("SFL Rate");            // Index 47
+    destination.add("SFL Phase");           // Index 48
+    destination.add("SFL Depth");           // Index 49
+    destination.add("SFL FB");              // Index 50
+    destination.add("DCH Rate");            // Index 51
+    destination.add("DCH Spread");          // Index 52
+    destination.add("DCH Depth");           // Index 53
+    destination.add("DCH Freq");            // Index 54
+    destination.add("DCH C-Amp");           // Index 55
+    destination.add("DCH C-Pan");           // Index 56
+    destination.add("DCH Mix");             // Index 57
+    destination.add("HDEL Speed");          // Index 58
+    destination.add("HDEL Length");         // Index 59
+    destination.add("HDEL Fade");           // Index 60
+    destination.add("HDEL Pan");            // Index 61
+    destination.add("HDEL Mix");            // Index 62
+    destination.add("DEC B-Fract");         // Index 63
+    destination.add("DEC S-Rate");          // Index 64
+    destination.add("DEC Mix");             // Index 65
+    destination.add("PREV B-Width");        // Index 66
+    destination.add("PREV Damping");        // Index 67
+    destination.add("PREV Decay");          // Index 68
+    destination.add("PREV Mix");            // Index 69
 
     this->initialiseSubMenus();
 }
@@ -104,8 +161,42 @@ MatrixTable::~MatrixTable()
         if(tmpRange != nullptr){
             tmpRange = nullptr;
         }
-
     }
+}
+
+/*
+ *        tmpRow.source = -1; // -1 Not set ignore
+        tmpRow.transform = -1;
+        tmpRow.intensity = 1.0;
+        tmpRow.range = 1.0;
+        tmpRow.destination = -1; // -1 Not set ignore
+        tmpRow.on = 0; //On off
+ *
+ */
+
+void MatrixTable::updateGui(){
+    for(int i= 0; i<numRows; i++){
+        rows[i].source = -1;
+        rows[i].transform = -1;
+        rows[i].intensity = 1.0;
+        rows[i].range = 1.0;
+        rows[i].destination = -1;
+        rows[i].on = 0;
+        rowIsActive[i] = false;
+    }
+
+    vector<MatrixRow> tmpRows = modMatrix.getRows();
+
+    if(!tmpRows.empty()){
+        for(int i=0; i<tmpRows.size(); i++){
+            const int index = tmpRows[i].id;
+
+            rows[index] = tmpRows[i];
+            rowIsActive[index] = true;
+        }
+    }
+    updateContent();
+    this->repaint();
 }
 
 int MatrixTable::getNumRows(){
@@ -146,9 +237,7 @@ void MatrixTable::initialiseHeader(float width, float height){
     setHeaderHeight(cellHeight);
     setRowHeight(cellHeight);
 
-
     setModel(this);
-
 }
 /* Paint Overlay, takes care of the divising of the cell blocks */
 
@@ -231,6 +320,9 @@ void MatrixTable::paintCell(Graphics &g,
 
         if(rows[rowNumber].destination != -1 && columnId == 5){
             int di = rows[rowNumber].destination;
+
+
+
             g.drawText(destination[di], 0, 0, width, height, Justification::centred);
         }
 
@@ -320,7 +412,6 @@ Component* MatrixTable::refreshComponentForCell(int rowNumber,
                     numberBox->setMinValue(0.0);
                 }
 
-
                 numberBox->setColour(Label::backgroundColourId, Colour(0x00000000));
                 numberBox->setColour(Label::outlineColourId, Colour(0x00000000));
                 numberBox->setJustificationType(Justification::centred);
@@ -401,7 +492,6 @@ Component* MatrixTable::refreshComponentForCell(int rowNumber,
                     }
                 }
         }
-
         return numberBox;
 
     } else {
@@ -509,14 +599,28 @@ bool MatrixTable::getEnabled(int id){
     return result;
 }
 
+/*
+ *  sources.add("LFO One");
+ *  sources.add("LFO Two");
+ *  sources.add("ENV One");
+ *  sources.add("ENV Two");
+ *  sources.add("SSEQ");
+ *  sources.add("PAD X");
+ *  sources.add("PAD Y");
+ *
+ */
+
 void MatrixTable::sourceMenu(int rowNumber){
     menu = new PopupMenu();
 
-    int i;
-
-    for(i=0; i<sources.size(); i++){
-        menu->addItem(i+1, sources[i], true, false, nullptr);
-    }
+    menu->addItem(1, "LFO One", true, false, nullptr);
+    menu->addItem(2, "LFO Two", true, false, nullptr);
+    menu->addItem(3, "Env One", true, false, nullptr);
+    menu->addItem(4, "Env Two", true, false, nullptr);
+    menu->addItem(5, "SSEQ", true, false, nullptr);
+    menu->addSeparator();
+    menu->addItem(6, "PAD X", true, false, nullptr);
+    menu->addItem(7, "PAD Y", true, false, nullptr);
 
     menu->addSeparator();
     menu->addItem(0xFF, "clear", true, false, nullptr);
@@ -532,7 +636,6 @@ void MatrixTable::sourceMenu(int rowNumber){
         /* elaborate and check for multiple targets */
 
         rows[rowNumber].transform = TRANSFORM::NONE;
-        std::cout << "source changed printing transform" << std::endl;
 
         if(rows[rowNumber].destination != -1){
             if(!rowIsActive[rowNumber]){
@@ -542,6 +645,8 @@ void MatrixTable::sourceMenu(int rowNumber){
                 modMatrix.addRow(rows[rowNumber]);
             } else {
                // getParentComponent()->postCommandMessage(SourceChangedId);
+                std::cout << "MatrixTable::sourceMenu" << rows[rowNumber].id << std::endl;
+
                 modMatrix.setSource(rows[rowNumber].source, rows[rowNumber].id);
             }
         }
@@ -611,10 +716,9 @@ void MatrixTable::transformMenu(int rowNumber){
     this->repaint();
 }
 
-void MatrixTable::destinationMenu(int rowNumber){
+void MatrixTable::destinationMenu(int rowNumber){    
     menu = new PopupMenu();
 
-    menu->addSubMenu("Preamp", preAmpMenu);
     menu->addSubMenu("Filter One", filterOneMenu);
     menu->addSubMenu("Filter Two", filterTwoMenu);
     menu->addSubMenu("Waveshaper", waveshaperMenu);
@@ -623,10 +727,12 @@ void MatrixTable::destinationMenu(int rowNumber){
     menu->addSubMenu("LFO Two", lfoTwo);
     menu->addSubMenu("Env One", envOne);
     menu->addSubMenu("Env Two", envTwo);
-    menu->addSubMenu("Step seq", sseq);
+    menu->addSubMenu("Step Seq", sseq);
+    menu->addSeparator();
+    menu->addSubMenu("FX One", effectOneMenu);
+    menu->addSubMenu("FX Two", effectTwoMenu);
     menu->addSeparator();
     menu->addItem(0xFF, "clear", true, false, nullptr);
-
 
     const int index = menu->show() -1;
 
@@ -660,50 +766,196 @@ void MatrixTable::destinationMenu(int rowNumber){
     this->repaint();
 }
 
-/* Test Menu's for now at a later point, Make the effect Menu's configurable
+/*
+ * Test Menu's for now at a later point, Make the effect Menu's configurable
  * by a setter, if a flexible effect section is implmented. Also keep in mind
  * that the modulation destinations have a fixed index.
  *
  */
 
 void MatrixTable::initialiseSubMenus(){
-    // Preamp Filter section
-    preAmpMenu.addItem(1, "Drive", true, false, nullptr);
-    preAmpMenu.addItem(2, "Amount", true, false, nullptr);
-
     // Filter one Menu
-    filterOneMenu.addItem(3, "Frequency", true, false, nullptr);
-    filterOneMenu.addItem(4, "Resonance", true, false, nullptr);
+    filterOneMenu.addItem(1, "Frequency", true, false, nullptr);
+    filterOneMenu.addItem(2, "Resonance", true, false, nullptr);
+    filterOneMenu.addItem(3, "Pass Band", true, false, nullptr);
+    filterOneMenu.addItem(4, "Drive", true, false, nullptr);
+    filterOneMenu.addItem(5, "Volume", true , false, nullptr);
 
     // Filter Two Menu
-    filterTwoMenu.addItem(5, "Frequency", true, false, nullptr);
-    filterTwoMenu.addItem(6, "Resonance", true, false, nullptr);
+    filterTwoMenu.addItem(6, "Frequency", true, false, nullptr);
+    filterTwoMenu.addItem(7, "Resonance", true, false, nullptr);
+    filterTwoMenu.addItem(8, "Pass Band", true, false, nullptr);
+    filterTwoMenu.addItem(9, "Drive", true, false, nullptr);
+    filterTwoMenu.addItem(10, "Volume", true, false, nullptr);
 
     // WavevShaper Menu
-    waveshaperMenu.addItem(7, "Drive", true, false, nullptr);
-    waveshaperMenu.addItem(8, "Mix", true, false, nullptr);
-    waveshaperMenu.addItem(9, "Amplitude", true,false, nullptr);
-    waveshaperMenu.addItem(10, "FX Routing", true, false, nullptr);
+    waveshaperMenu.addItem(11, "Drive", true, false, nullptr);
+    waveshaperMenu.addItem(12, "Mix", true, false, nullptr);
     //Low Frequency Osc Menu One
-    lfoOne.addItem(11, "Frequency", true, false, nullptr);
-    lfoOne.addItem(12, "Phase", true, false, nullptr);
-    lfoOne.addItem(13, "PWM", true, false, nullptr);
+    lfoOne.addItem(13, "Frequency", true, false, nullptr);
+    lfoOne.addItem(14, "Phase", true, false, nullptr);
+    lfoOne.addItem(15, "PWM", true, false, nullptr);
     //Low Frequency Osc Menu Two
-    lfoTwo.addItem(14, "Frequency", true, false, nullptr);
-    lfoTwo.addItem(15, "Phase", true, false, nullptr);
-    lfoTwo.addItem(16, "PWM", true, false, nullptr);
+    lfoTwo.addItem(16, "Frequency", true, false, nullptr);
+    lfoTwo.addItem(17, "Phase", true, false, nullptr);
+    lfoTwo.addItem(18, "PWM", true, false, nullptr);
     //Envelopes
-    envOne.addItem(17, "Duration", true, false, nullptr);
-    envTwo.addItem(18, "Duration", true, false, nullptr);
+    envOne.addItem(19, "Duration", true, false, nullptr);
+    envTwo.addItem(20, "Duration", true, false, nullptr);
     //Step Sequencer
-    sseq.addItem(19, "Duration", true, false, nullptr);
-    sseq.addItem(20, "Length", true, false, nullptr);
-    sseq.addItem(21, "Off value", true, false, nullptr);
-    sseq.addItem(22, "Curve", true, false, nullptr);
+    sseq.addItem(21, "Duration", true, false, nullptr);
+    sseq.addItem(22, "Length", true, false, nullptr);
+    sseq.addItem(23, "Off value", true, false, nullptr);
 
     // FX Menus
-    effectOneMenu.addItem(10, "none", true, false, nullptr);
-    effectTwoMenu.addItem(11, "none", true, false, nullptr);
+    effectOneMenu.addItem(-1, "None", true, false, nullptr);
+    effectTwoMenu.addItem(-1, "None", true, false, nullptr);
 }
 
+void MatrixTable::setEffectsDestination(int fxProcessor, int effect){
+    if(effect == 1){
+        switch(fxProcessor){
+            case 2:
+                initialiseStereoDelayMenu(effectOneMenu);
+                break;
+            case 3:
+                initialisePingPongDelayMenu(effectOneMenu);
+                break;
+            case 4:
+                initialiseLCRDelayMenu(effectOneMenu);
+                break;
+            case 5:
+                initialiseStereoFlangerMenu(effectOneMenu);
+                break;
+            case 6:
+                initialiseDimensionChorusMenu(effectOneMenu);
+                break;
+            case 7:
+                initialiseHoldDelayMenu(effectOneMenu);
+                break;
+            case 8:
+                initialiseDecimatorMenu(effectOneMenu);
+                break;
+            case 9:
+                initialisePlateReverb(effectOneMenu);
+                break ;
+            default:
+                effectOneMenu.clear();
+                effectOneMenu.addItem(-1, "None", true, false, nullptr);
+                break;
+        }
 
+    } else if(effect == 2){
+        switch(fxProcessor){
+            case 2:
+                initialiseStereoDelayMenu(effectTwoMenu);
+                break;
+            case 3:
+                initialisePingPongDelayMenu(effectTwoMenu);
+                break;
+            case 4:
+                initialiseLCRDelayMenu(effectTwoMenu);
+                break;
+            case 5:
+                initialiseStereoFlangerMenu(effectTwoMenu);
+                break;
+            case 6:
+                initialiseDimensionChorusMenu(effectTwoMenu);
+                break;
+            case 7:
+                initialiseHoldDelayMenu(effectTwoMenu);
+                break;
+            case 8:
+                initialiseDecimatorMenu(effectTwoMenu);
+                break;
+            case 9:
+                initialisePlateReverb(effectTwoMenu);
+                break;
+            default:
+                effectTwoMenu.clear();
+                effectTwoMenu.addItem(-1, "None", true, false, nullptr);
+                break;
+        }
+    }
+}
+
+void MatrixTable::initialiseStereoDelayMenu(PopupMenu &menu){
+    menu.clear();
+    menu.addItem(24, "Cross", true, false, nullptr);
+    menu.addItem(25, "Mix", true, false, nullptr);
+    menu.addItem(26, "L-Delay", true, false, nullptr);
+    menu.addItem(27, "L-FB", true, false, nullptr);
+    menu.addItem(28, "R-Delay", true, false, nullptr);
+    menu.addItem(29, "R-FB", true, false, nullptr);
+}
+
+void MatrixTable::initialisePingPongDelayMenu(PopupMenu &menu){
+    menu.clear();
+    menu.addItem(30, "L-Delay", true, false, nullptr);
+    menu.addItem(31, "L-FB", true, false, nullptr);
+    menu.addItem(32, "L-Mix", true, false, nullptr);
+    menu.addItem(33, "R-Delay", true, false, nullptr);
+    menu.addItem(34, "R-FB", true, false, nullptr);
+    menu.addItem(35, "R-Mix", true, false, nullptr);
+}
+
+void MatrixTable::initialiseLCRDelayMenu(PopupMenu &menu){
+   menu.clear();
+   menu.addItem(36, "L-Delay", true, false, nullptr);
+   menu.addItem(37, "L-FB", true, false, nullptr);
+   menu.addItem(38, "L-Mix", true, false, nullptr);
+   menu.addItem(39, "C-Delay", true, false, nullptr);
+   menu.addItem(40, "C-FB", true, false, nullptr);
+   menu.addItem(41, "HPF Freq", true, false, nullptr);
+   menu.addItem(42, "LPF Freq", true, false, nullptr);
+   menu.addItem(43, "C-Amp", true, false, nullptr);
+   menu.addItem(44, "C-Pan", true, false, nullptr);
+   menu.addItem(45, "R-Delay", true, false, nullptr);
+   menu.addItem(46, "R-FB", true, false, nullptr);
+   menu.addItem(47, "R-Mix", true, false, nullptr);
+}
+
+void MatrixTable::initialiseStereoFlangerMenu(PopupMenu &menu){
+   menu.clear();
+   menu.addItem(48, "Rate", true, false, nullptr);
+   menu.addItem(49, "Phase", true, false, nullptr);
+   menu.addItem(50, "Depth", true, false, nullptr);
+   menu.addItem(51, "FB", true, false, nullptr);
+}
+
+void MatrixTable::initialiseDimensionChorusMenu(PopupMenu &menu){
+   menu.clear();
+   menu.addItem(52, "Rate", true, false, nullptr);
+   menu.addItem(53, "Spread", true, false, nullptr);
+   menu.addItem(54, "Depth", true, false, nullptr);
+   menu.addItem(55, "HPF Freq", true, false, nullptr);
+   menu.addItem(56, "C-Amp", true, false, nullptr);
+   menu.addItem(57, "C-Pan", true, false, nullptr);
+   menu.addItem(58, "Mix", true, false, nullptr);
+}
+
+void MatrixTable::initialiseHoldDelayMenu(PopupMenu &menu){
+   menu.clear();
+   menu.addItem(59, "Speed", true, false, nullptr);
+   menu.addItem(60, "Length", true, false, nullptr);
+   menu.addItem(61, "Fade", true, false, nullptr);
+   menu.addItem(62, "Pan", true, false, nullptr);
+   menu.addItem(63, "Mix", true , false, nullptr);
+}
+
+void MatrixTable::initialiseDecimatorMenu(PopupMenu &menu){
+    menu.clear();
+    menu.addItem(64, "B-Fraction", true, false, nullptr);
+    menu.addItem(65, "S-Rate", true, false, nullptr);
+    menu.addItem(66, "Mix", true, false, nullptr);
+}
+
+void MatrixTable::initialisePlateReverb(PopupMenu &menu){
+    menu.clear();
+
+    menu.addItem(67, "Bandwidth", true, false, nullptr);
+    menu.addItem(68, "Damping", true, false, nullptr);
+    menu.addItem(69, "Decay", true, false, nullptr);
+    menu.addItem(70, "Mix", true, false, nullptr);
+
+}

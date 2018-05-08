@@ -61,7 +61,14 @@ public:
 
     msmBuffer getBuffer();
 
+    void setBeatDivisionStrings(StringArray beatDivStr);
+    void setBeatDivisionValues(std::vector<double> beatDivVal);
+
+    void initFrequencySlider();
+
     void handleCommandMessage(int commandId) override;
+
+    void updateGui();
     //[/UserMethods]
 
     void paint (Graphics& g) override;
@@ -72,26 +79,32 @@ public:
     void mouseExit (const MouseEvent& e) override;
     void modifierKeysChanged (const ModifierKeys& modifiers) override;
 
-
-
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
     AkatekoAudioProcessor &processor;
 
+    void updateParameters();
     void initialiseDefaultShapes();
     void resetShapButtonColour(int shapeButton);
     void setShape(Button *buttonThatWasClicked, int shape);
+
+    int findClosestTimeDivision(double freq);
 
     msmBuffer currentBuffer;
     StringArray currentShapes;
     StringArray defaultShapes;
 
+    StringArray beatDivision;
+    std::vector<double> valueBeatDivision;
+
+    AudioProcessorParameter *frequency;
     AudioProcessorParameter *activeShape;
     AudioProcessorParameter *oneShot;
     AudioProcessorParameter *sync;
 
     Label &labelRef;
 
+    double bpm;
     bool defaultShape;
     int lfoNumber;
 

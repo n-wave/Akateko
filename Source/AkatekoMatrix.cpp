@@ -20,35 +20,43 @@ void AkatekoMatrix::update(){
         int source = rows[i].source;
         int transform = rows[i].transform ;
         int destination = rows[i].destination;
-        double range = 1.0;
+        double range = rows[i].range;
         double intensity = rows[i].intensity;
 
         double sourceValue = writeRegisters[source];
 
+        if(source == MODSRC::LFO1 || source == MODSRC::LFO2){
+            if(transform == TRANSFORM::UNIPOLAR){
+                sourceValue = msm::bipolarToUnitpolar(sourceValue);
+            }
+        }
 
+        else if(source == MODSRC::ENV1 ||
+                source == MODSRC::ENV2 ||
+                source == MODSRC::PADX ||
+                source == MODSRC::PADY)
+        {
+            if(transform == TRANSFORM::BIPOLAR){
+                sourceValue = msm::unipolarToBipolar(sourceValue);
+            }
+        }
 
         //std::cout << "Range in Modulation Matrix : " << range << std::endl;
 
-        if(destination == DESTSRC::F1FREQ ||
-           destination == DESTSRC::F2FREQ)
-        {
-           range  = rows[i].range*FILTER_FC_MODRANGE;
+        //std::cout << "Scaled Range in Modulation Matrix : " << range << std::endl;
+        //std::cout << "Intensity in Modulation Matrix : " << intensity << std::endl;
+        if(rows[i].on == 1){
+            readRegisters[destination] += sourceValue*intensity*range;
         }
 
-    //    std::cout << "Scaled Range in Modulation Matrix : " << range << std::endl;
-  //     std::cout << "Intensity in Modulation Matrix : " << intensity << std::endl;
-
-
-        readRegisters[destination] += sourceValue*intensity*range;
-
-//        std::cout << "current Read Register : " << readRegisters[destination] << std::endl;
+        //std::cout << "current Read Register : " << readRegisters[destination] << std::endl;
 
 
     }
 }
 
 void AkatekoMatrix::setSource(int source, int id){
-    if(!rows.empty() && id >= 0 && id <= rows.size()){
+    if(!rows.empty()){
         if(source >= 0 && source <= MODSRC::SRCSIZE){
             bool foundId = false;
             int index = 0;
@@ -62,12 +70,14 @@ void AkatekoMatrix::setSource(int source, int id){
                 }
                 index++;
             }
+
+            std::cout << toString() << std::endl;
         }
     }
 }
 
 void AkatekoMatrix::setDestination(int destination, int id){
-    if(!rows.empty() && id >= 0 && id <= rows.size()){
+    if(!rows.empty()){
         if(destination >= 0 && destination <= DESTSRC::DSTSIZE){
             bool foundId = false;
             int index = 0;
@@ -103,10 +113,65 @@ void AkatekoMatrix::setTransform(int transform, int id){
                     rows[index].transform = transform;
                 }
 
-
                foundId = true;
             }
             index++;
         }
     }
 }
+
+/* Store String in preset */
+
+String AkatekoMatrix::toString(){
+    String tmpString = String("mm") + " ";
+
+    for(int i=0; i<rows.size(); i++){
+        tmpString += String(rows[i].id) + " ";
+        tmpString += String(rows[i].source) + " ";
+        tmpString += String(rows[i].transform) + " ";
+        tmpString += String(rows[i].range) + " ";
+        tmpString += String(rows[i].intensity) + " ";
+        tmpString += String(rows[i].destination) + " ";
+        tmpString += String(rows[i].on) + " ";
+    }
+
+    return tmpString;
+}
+
+void AkatekoMatrix::restoreFromString(const String &matrix){
+    StringArray tokens;
+
+    tokens.addTokens(matrix, " ", "\"");
+    int tokenSize = tokens.size();
+
+    if(tokenSize >= 8 && tokens[0] == "mm"){
+        rows.clear(); //Clear rows and start adding.
+
+        int nrOfSteps = (tokenSize-1)/7;
+        int stepIndex = 0;
+        int index = 1;
+
+        std::cout << "AkatekoMatrix::restoreFromString" << std::endl;
+        std::cout << "Printing number of steps : "<< nrOfSteps << std::endl;
+
+        while(index < tokenSize && stepIndex < nrOfSteps){
+            MatrixRow tmpRow = MatrixRow();
+
+            tmpRow.id = tokens[index].getIntValue();
+            tmpRow.source = tokens[index+1].getIntValue();
+            tmpRow.transform = tokens[index+2].getIntValue();
+            tmpRow.range = tokens[index+3].getDoubleValue();
+            tmpRow.intensity = tokens[index+4].getDoubleValue();
+            tmpRow.destination = tokens[index+5].getIntValue();
+            tmpRow.on = tokens[index+6].getIntValue();
+
+            addRow(tmpRow);
+
+            index += 7;
+            stepIndex++;
+        }
+    }
+}
+
+
+

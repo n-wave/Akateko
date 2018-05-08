@@ -25,22 +25,30 @@
 
 //[MiscUserDefs] You can add your own user definitions and misc code here...
 #include <iostream>
-#include <vector>
 
 using std::vector;
+
+/* initialiser list
+ *
+ *  Component::Component(name),
+ *  processor(p),
+ *  minDur(0),
+ *  maxDur(0),
+ *  range(0),
+ *  commandExponent(-1),
+ *  duration(nullptr),
+ *  labelRef(label)
+ *
+ */
+
 //[/MiscUserDefs]
 
 //==============================================================================
 StepSequencerComponent::StepSequencerComponent (const String &name,AkatekoAudioProcessor &p, Label &label)
     : Component::Component(name),
       processor(p),
-      commandValues(-1),
-      commandStates(-1),
-      commandSize(-1),
-      commandOffset(-1),
-      commandSync(-1),
-      commandDuration(-1),
-      commandExponent(-1)
+      duration(nullptr),
+      labelRef(label)
 {
     //[Constructor_pre] You can add your own custom stuff here..
 
@@ -68,7 +76,10 @@ StepSequencerComponent::StepSequencerComponent (const String &name,AkatekoAudioP
         addAndMakeVisible(enableToggle = new ParamToggle(paramName[0], *p.getParameters().getUnchecked(paramIndices[0]), label));
         addAndMakeVisible(syncToggle = new ParamToggle(paramName[1], *p.getParameters().getUnchecked(paramIndices[1]), label));
         addAndMakeVisible(chopperToggle = new ParamToggle(paramName[2], *p.getParameters().getUnchecked(paramIndices[2]), label));
-        addAndMakeVisible(durationSlider = new ParamSlider(paramName[3], *p.getParameters().getUnchecked(paramIndices[3]), label, 50.f, 5000.f));
+
+        addAndMakeVisible(durationSlider = new Slider(paramName[3]));
+        duration = p.getParameters().getUnchecked(paramIndices[3]);
+
         addAndMakeVisible(stepLengthSlider = new ParamSlider(paramName[4], *p.getParameters().getUnchecked(paramIndices[4]), label, 0.05f, 1.00));
         addAndMakeVisible(offsetSlider = new ParamSlider(paramName[5], *p.getParameters().getUnchecked(paramIndices[5]), label, 0.f, 1.f));
         addAndMakeVisible(exponentSlider = new ParamSlider(paramName[6], *p.getParameters().getUnchecked(paramIndices[6]), label));
@@ -87,8 +98,7 @@ StepSequencerComponent::StepSequencerComponent (const String &name,AkatekoAudioP
         std::cout << "/------------Parameters not bound------------/" << std::endl;
     }
 
-    //[/Constructor_pre]
-
+    //[/Constructor_pre
 
     //[UserPreSize]
     addAndMakeVisible (stepSequencer = new StepSequencer ("sseq"));
@@ -105,10 +115,10 @@ StepSequencerComponent::StepSequencerComponent (const String &name,AkatekoAudioP
     syncToggle->setButtonText (String());
     syncToggle->addListener (this);
 
-
-    durationSlider->setRange (0, 1, 0);
+    durationSlider->setRange(50.f, 5000.f, 0);
     durationSlider->setSliderStyle (Slider::LinearHorizontal);
     durationSlider->setTextBoxStyle (Slider::NoTextBox, false, 80, 20);
+    durationSlider->addListener(this);
 
     stepComboBox->setEditableText (false);
     stepComboBox->setJustificationType (Justification::centredLeft);
@@ -119,6 +129,7 @@ StepSequencerComponent::StepSequencerComponent (const String &name,AkatekoAudioP
     stepComboBox->addItem (TRANS("16"), 3);
     stepComboBox->addItem (TRANS("24"), 4);
     stepComboBox->addItem (TRANS("32"), 5);
+    stepComboBox->postCommandMessage(ParamComboBox::update);
     stepComboBox->addListener (this);
 
     addAndMakeVisible (nameLabel = new Label ("nameLabel",
@@ -137,6 +148,7 @@ StepSequencerComponent::StepSequencerComponent (const String &name,AkatekoAudioP
     exponentSlider->setRange (0, 1, 0);
     exponentSlider->setSliderStyle (Slider::LinearHorizontal);
     exponentSlider->setTextBoxStyle (Slider::NoTextBox, false, 80, 20);
+    exponentSlider->setDoubleClickReturnValue(true, 0.5);
     exponentSlider->addListener(this);
 
     chopperToggle->setTooltip (TRANS("Generated curve is affected by the step Length"));
@@ -149,9 +161,10 @@ StepSequencerComponent::StepSequencerComponent (const String &name,AkatekoAudioP
     //[/UserPreSize]
 
     setSize (515, 250);
-
-
     //[Constructor] You can add your own custom stuff here..
+    initialiseBeatDivision();
+    calculateBeatDivision(120.0); //standard
+    initDurationSlider();
     //[/Constructor]
 }
 
@@ -159,6 +172,7 @@ StepSequencerComponent::~StepSequencerComponent()
 {
     //[Destructor_pre]. You can add your own custom destruction code here..
     //[/Destructor_pre]
+
     stepSequencer = nullptr;
     stepLengthSlider = nullptr;
     enableToggle = nullptr;
@@ -170,7 +184,9 @@ StepSequencerComponent::~StepSequencerComponent()
     exponentSlider = nullptr;
     chopperToggle = nullptr;
     textButton = nullptr;
+
     //[Destructor]. You can add your own custom destruction code here..
+    duration = nullptr;
     //[/Destructor]
 }
 
@@ -243,14 +259,47 @@ void StepSequencerComponent::buttonClicked (Button* buttonThatWasClicked)
     else if (buttonThatWasClicked == syncToggle)
     {
         //[UserButtonCode_syncToggle] -- add your button handler code here..
-        //stepSequencer->printValues();
+        double tmpDur = 0.0;
 
+        if(duration != nullptr){
+            tmpDur = duration->getValue();
+
+
+            const bool tmpSync = syncToggle->getToggleState();
+            if(tmpSync){
+                const int tmpIndex = findClosestTimeDivision(tmpDur);
+                const double startDur =  valueBeatDivision[0];
+                const double endDur = valueBeatDivision[valueBeatDivision.size()-1];
+
+                durationSlider->setRange(0, valueBeatDivision.size()-1);
+                durationSlider->setValue(tmpIndex, sendNotification);
+                duration->setValue(valueBeatDivision[tmpIndex]);
+
+                processor.setStepDurationBounds(startDur, endDur);
+            } else {
+                if(tmpDur >= 5000.f){
+                    tmpDur = 5000.f;
+                }
+
+                if(tmpDur <= 50.f){
+                    tmpDur = 50.f;
+                }
+
+                durationSlider->setRange(50.f, 5000.f);
+                duration->setValue(tmpDur);
+                durationSlider->setValue(tmpDur, sendNotification);
+
+                processor.setStepDurationBounds(50.0, 5000.0);
+            }
+        } else {
+            std::cerr << "Parameters not bound properly, duration not set : " << getName() << std::endl;
+        }
         //[/UserButtonCode_syncToggle]
     }
     else if (buttonThatWasClicked == chopperToggle)
     {
         //[UserButtonCode_chopperToggle] -- add your button handler code here..
-        processor.setChopCurve();
+        processor.updateChopCurve();
         //[/UserButtonCode_chopperToggle]
     }
     else if (buttonThatWasClicked == textButton)
@@ -261,6 +310,49 @@ void StepSequencerComponent::buttonClicked (Button* buttonThatWasClicked)
 
     //[UserbuttonClicked_Post]
     //[/UserbuttonClicked_Post]
+}
+
+void StepSequencerComponent::sliderValueChanged (Slider* sliderThatWasMoved)
+{
+    //[UsersliderValueChanged_Pre]
+    //[/UsersliderValueChanged_Pre]
+
+    if (sliderThatWasMoved == durationSlider)
+    {
+        //[UserSliderCode_durationSlider] -- add your slider handling code here..
+
+        String tmpName = durationSlider->getName();
+
+        if(syncToggle != nullptr && duration != nullptr){
+            const bool tmpSync = syncToggle->getToggleState();
+            if(tmpSync){
+                int tmpVal = durationSlider->getValue();
+
+                if(tmpVal < beatDivision.size() &&
+                   tmpVal < valueBeatDivision.size())
+                {
+                    double tmpDur = valueBeatDivision[tmpVal];
+                    tmpName += beatDivision[tmpVal];
+                    duration->setValue(tmpDur);
+                    processor.updateDuration();
+                }
+            } else {
+                double tmpDur = durationSlider->getValue();
+
+                durationSlider->setRange(50.f, 5000.f);
+                duration->setValue(tmpDur);
+                processor.updateDuration();
+                tmpName += String(tmpDur, 2);
+            }
+
+           labelRef.setText(tmpName, dontSendNotification);
+        }
+
+        //[/UserSliderCode_durationSlider]
+    }
+
+    //[UsersliderValueChanged_Post]
+    //[/UsersliderValueChanged_Post]
 }
 
 void StepSequencerComponent::comboBoxChanged (ComboBox* comboBoxThatHasChanged)
@@ -302,21 +394,6 @@ void StepSequencerComponent::comboBoxChanged (ComboBox* comboBoxThatHasChanged)
     //[/UsercomboBoxChanged_Post]
 }
 
-void StepSequencerComponent::sliderValueChanged (Slider* sliderThatWasMoved)
-{
-    //[UsersliderValueChanged_Pre]
-    //[/UsersliderValueChanged_Pre]
-
-    if (sliderThatWasMoved == exponentSlider)
-    {
-        //[UserSliderCode_exponentSlider] -- add your slider handling code here..
-        //[/UserSliderCode_exponentSlider]
-    }
-
-    //[UsersliderValueChanged_Post]
-    //[/UsersliderValueChanged_Post]
-}
-
 void StepSequencerComponent::handleCommandMessage (int commandId)
 {
     //[UserCode_handleCommandMessage] -- Add your code here...
@@ -333,61 +410,15 @@ void StepSequencerComponent::handleCommandMessage (int commandId)
     //[/UserCode_handleCommandMessage]
 }
 
-
-
 //[MiscUserCode] You can add your own definitions of your custom methods or any other code here...
 
 void StepSequencerComponent::sliderDragEnded(Slider *sliderThatWasDragged){
     if (sliderThatWasDragged == exponentSlider)
     {
         //[UserSliderCode_exponentSlider] -- add your slider handling code here..
-        processor.setStepMidPoint();
+        processor.updateStepMidPoint();
         //[/UserSliderCode_exponentSlider]
     }
-}
-
-vector<double> StepSequencerComponent::getStepValues(){
-    return stepSequencer->getStepValues();
-}
-
-vector<int> StepSequencerComponent::getButtonStates(){
-    return stepSequencer->getButtonStates();
-}
-
-int StepSequencerComponent::getStepAmount(){
-    return stepAmount;
-}
-
-void StepSequencerComponent::setValuesCommandId(int hashCode){
-    commandValues = hashCode;
-}
-
-void StepSequencerComponent::setStatesCommandId(int hashCode){
-    commandStates = hashCode;
-}
-
-void StepSequencerComponent::setSizeCommandId(int hashCode){
-    commandSize = hashCode;
-}
-
-void StepSequencerComponent::setOffsetCommandId(int hashCode){
-    commandOffset = hashCode;
-}
-
-void StepSequencerComponent::setSyncCommandId(int hashCode){
-    commandSync = hashCode;
-}
-
-void StepSequencerComponent::setChopCommandId(int hashCode){
-    commandChop = hashCode;
-}
-
-void StepSequencerComponent::setDurationCommandId(int hashCode){
-    commandDuration = hashCode;
-}
-
-void StepSequencerComponent::setExponentCommandId(int hashCode){
-    commandExponent = hashCode;
 }
 
 String StepSequencerComponent::getUIState(){
@@ -398,6 +429,140 @@ void StepSequencerComponent::setUIState(String state){
    stepSequencer->restoreFromString(state);
 }
 
+
+void StepSequencerComponent::initialiseBeatDivision(){
+    StringArray noteVals;
+
+    noteVals.add("1/4N");
+    noteVals.add("1/2N");
+    noteVals.add("1N");
+    noteVals.add("2N");
+    noteVals.add("3N");
+    noteVals.add("4N");
+
+    beatDivision.clear();
+
+    for(int i=0; i<noteVals.size(); i++){
+        String dot = noteVals[i] + String("D");
+        String triplet = noteVals[i] + String("T");
+
+        beatDivision.add(triplet);
+        beatDivision.add(noteVals[i]);
+        beatDivision.add(dot);
+    }
+}
+
+void StepSequencerComponent::calculateBeatDivision(double bpm){
+    if(bpm > 0.0){
+        double T = 60000.0/bpm;
+
+        double tripNote = T*(2.0/3.0);
+        double wholeNote = T;
+        double dotNote = T*1.5;
+
+        valueBeatDivision.clear();
+
+        valueBeatDivision.push_back(tripNote);
+        valueBeatDivision.push_back(wholeNote);
+        valueBeatDivision.push_back(dotNote);
+
+        for(int i=3; i<beatDivision.size(); i += 3){
+            tripNote *= 2.0;
+            wholeNote *= 2.0;
+            dotNote *= 2.0;
+
+            valueBeatDivision.push_back(tripNote);
+            valueBeatDivision.push_back(wholeNote);
+            valueBeatDivision.push_back(dotNote);
+        }
+    }
+    initDurationSlider();
+}
+
+void StepSequencerComponent::initDurationSlider(){
+    if(syncToggle != nullptr &&
+       duration != nullptr &&
+       beatDivision.size() != 0 &&
+       valueBeatDivision.size() != 0)
+    {
+        double tmpDur = duration->getValue();
+        const bool tmpSync = syncToggle->getToggleState();
+
+        if(tmpSync){
+            int tmpIndex = findClosestTimeDivision(tmpDur);
+
+            durationSlider->setRange(0, valueBeatDivision.size()-1);
+            durationSlider->setValue(tmpIndex);
+        } else {
+            if(tmpDur >= 5000.0f){
+                tmpDur = 5000.0f;
+            }
+
+            if(tmpDur <= 50.f){
+                tmpDur = 50.f;
+            }
+
+            durationSlider->setRange(50.0, 5000.0);
+            durationSlider->setValue(tmpDur);
+        }
+    } else {
+        if(syncToggle == nullptr || duration == nullptr){
+            std::cerr << "Parameters not bound properly" << std::endl;
+        }
+
+        if(beatDivision.size() == 0 || valueBeatDivision.size() == 0){
+            std::cerr << "Beat Division tables not set" << std::endl;
+        }
+    }
+}
+
+int StepSequencerComponent::findClosestTimeDivision(double period){
+    double tmpPeriod = period;
+    int result = 0;
+    int nrOfSteps = valueBeatDivision.size();
+
+    if(period != 0 && nrOfSteps != 0){
+        bool run = true;
+        int index = 1;
+
+        while(run && index < nrOfSteps-1){
+            double prev = valueBeatDivision[index-1];
+            double val = valueBeatDivision[index];
+            double next = valueBeatDivision[index+1];
+
+            if(val == tmpPeriod){
+                result = index;
+                run = false;
+            }
+
+            if(tmpPeriod >= prev && tmpPeriod < val){
+                result = index-1;
+                run = false;
+            }
+
+            if(tmpPeriod <= next && tmpPeriod > val ){
+                result = index+1;
+                run = false;
+            }
+            index +=3;
+        }
+    }
+    return result;
+}
+
+void StepSequencerComponent::updateGui(){
+    enableToggle->postCommandMessage(ParamToggle::update);
+    syncToggle->postCommandMessage(ParamToggle::update);
+    chopperToggle->postCommandMessage(ParamToggle::update);
+    stepLengthSlider->postCommandMessage(ParamSlider::update);
+    offsetSlider->postCommandMessage(ParamSlider::update);
+    exponentSlider->postCommandMessage(ParamSlider::update);
+    stepComboBox->postCommandMessage(ParamSlider::update);
+
+    initDurationSlider();
+    processor.setStepValues(stepSequencer->getStepValues());
+    processor.setButtonStates(stepSequencer->getButtonStates());
+}
 //[/MiscUserCode]
 
 
@@ -447,7 +612,7 @@ BEGIN_JUCER_METADATA
           virtualName="Slider" explicitFocusOrder="0" pos="408 56 104 20"
           min="0" max="1" int="0" style="LinearHorizontal" textBoxPos="NoTextBox"
           textBoxEditable="1" textBoxWidth="80" textBoxHeight="20" skewFactor="1"
-          needsCallback="0"/>
+          needsCallback="1"/>
   <COMBOBOX name="stepComboBox" id="76c1081265fe0ec3" memberName="stepComboBox"
             virtualName="" explicitFocusOrder="0" pos="412 224 96 20" editable="0"
             layout="33" items="8&#10;12&#10;16&#10;24&#10;32" textWhenNonSelected="Step Amount"

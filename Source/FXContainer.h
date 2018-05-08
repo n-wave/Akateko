@@ -17,16 +17,24 @@
   ==============================================================================
 */
 
-#ifndef __JUCE_HEADER_458886B41B1B6C46__
-#define __JUCE_HEADER_458886B41B1B6C46__
+#ifndef __JUCE_HEADER_B539B8D0F4E3ECFE__
+#define __JUCE_HEADER_B539B8D0F4E3ECFE__
 
 //[Headers]     -- You can add your own extra header files here --
 #include "../JuceLibraryCode/JuceHeader.h"
-#include "/work/programming-projects/msm/msm-gui/QTableDrawing.h"
+#include "PluginProcessor.h"
 #include "/work/programming-projects/msm/msm-gui/ParamSlider.h"
 #include "/work/programming-projects/msm/msm-gui/ParamToggle.h"
+#include "/work/programming-projects/msm/msm-gui/ParamComboBox.h"
 
-#include "PluginProcessor.h"
+#include "StereoDelayComponent.h"
+#include "PingPongComponent.h"
+#include "LCRDelayComponent.h"
+#include "StereoFlangerComponent.h"
+#include "DimensionChorusComponent.h"
+#include "HoldDelayComponent.h"
+#include "DecimatorComponent.h"
+#include "PlateReverbComponent.h"
 //[/Headers]
 
 
@@ -39,86 +47,81 @@
     Describe your class and how it works here!
                                                                     //[/Comments]
 */
-class WaveShapeComponent  : public Component,
-                            public ButtonListener
+class FXContainer  : public Component,
+                     public ComboBoxListener,
+                     public SliderListener,
+                     public ButtonListener
 {
 public:
     //==============================================================================
-    WaveShapeComponent (const String &name, AkatekoAudioProcessor &p, Label &label);
-    ~WaveShapeComponent();
+    FXContainer (const String &name, AkatekoAudioProcessor &p, Label &label);
+    ~FXContainer();
 
     //==============================================================================
     //[UserMethods]     -- You can add your own custom methods in this section.
-    void setUpdateCommandId(int hashCode);
+    void setEffect(int fxIndex, int effect);
+    String getUIState();
+    void setUITState(String state);
 
-    String getCurrentShape(); //when shape is updated call and store in the processor
-    StringArray getCurrentShapes();
-    void setCurrentShapes(StringArray shapes); //After first startup
+    void setEffectOneUpdateId(int commandId);
+    void setEffectTwoUpdateId(int commandId);
 
-    msmBuffer getBuffer();
+    int getActiveEffectProcessor(int effect);
 
     void updateGui();
     //[/UserMethods]
 
     void paint (Graphics& g) override;
     void resized() override;
+    void comboBoxChanged (ComboBox* comboBoxThatHasChanged) override;
+    void sliderValueChanged (Slider* sliderThatWasMoved) override;
     void buttonClicked (Button* buttonThatWasClicked) override;
-    void handleCommandMessage (int commandId) override;
-    void mouseEnter (const MouseEvent& e) override;
-    void mouseExit (const MouseEvent& e) override;
-    void modifierKeysChanged (const ModifierKeys& modifiers) override;
 
 
 
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
-    void initialiseActiveShape();
-    void initialiseDefaultShapes();
-    void resetShapButtonColour(int shapeButton);
-    void setShape(Button *buttonThatWasClicked, int shape);
+    void initialiseEffectsStrings();
 
     AkatekoAudioProcessor &processor;
-
-    StringArray defaultShapes;
-    StringArray currentShapes;
-    AudioProcessorParameter *activeShape;
     Label &labelRef;
 
-    int commandUpdate;
-    bool defaultShape;
+    AudioProcessorParameter *fxInput;
+    AudioProcessorParameter *fxRouting;
 
-    float overlayWidth;
-    float overlayHeight;
-    float overlayXPos;
-    float overlayYPos;
+    int activeEffect;
+    int effectFXOne;
+    int effectFXTwo;
+
+    int effectOneUpdateId;
+    int effectTwoUpdateId;
+
+    // Parameters Destinations for the
+    // Modulation Matrix Menus
 
     Colour buttonColour;
     Colour activeColour;
+
+    StringArray effects;
     //[/UserVariables]
 
     //==============================================================================
-    ScopedPointer<QTableDrawing> waveShaperDrawing;
-    ScopedPointer<Slider> waveShapeDriveSlider;
-    ScopedPointer<Slider> waveShapeMixSlider;
-    ScopedPointer<ToggleButton> waveshaperToggle;
-    ScopedPointer<TextButton> loadShapeButton;
-    ScopedPointer<TextButton> waveShapeSaveButton;
-    ScopedPointer<TextButton> shapeButtonOne;
-    ScopedPointer<TextButton> shapeButtonTwo;
-    ScopedPointer<TextButton> shapeButtonThree;
-    ScopedPointer<TextButton> shapeButtonFour;
-    ScopedPointer<TextButton> shapeButtonFive;
-    ScopedPointer<TextButton> shapeButtonSix;
-    ScopedPointer<TextButton> clearShapeButton;
-    ScopedPointer<TextButton> shapeButtonSeven;
-    ScopedPointer<TextButton> shapeButtonEight;
+    ScopedPointer<ToggleButton> enableFXToggleButton;
+    ScopedPointer<ComboBox> fxConfigComboBox;
+    ScopedPointer<Slider> fxInputAmp;
+    ScopedPointer<Slider> fxRoutingAmp;
+    ScopedPointer<Component> effectOne;
+    ScopedPointer<Component> effectTwo;
+    ScopedPointer<TextButton> fxButtonTwo;
+    ScopedPointer<TextButton> fxButtonOne;
+    ScopedPointer<ComboBox> fxEffectBox;
 
 
     //==============================================================================
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (WaveShapeComponent)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (FXContainer)
 };
 
 //[EndFile] You can add extra defines here...
 //[/EndFile]
 
-#endif   // __JUCE_HEADER_458886B41B1B6C46__
+#endif   // __JUCE_HEADER_B539B8D0F4E3ECFE__

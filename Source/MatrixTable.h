@@ -25,8 +25,8 @@ public:
     MatrixTable(ModulationMatrix &modm);
     ~MatrixTable();
 
-
     msm::MatrixRow getMatrixRow(int id);
+    void updateGui();
 
     int getNumRows() override;
     void listWasScrolled() override;
@@ -72,23 +72,22 @@ public:
     int getDestination(int id);
     bool getEnabled(int id);
 
-    enum CommandIds {
-        RowAddedId,
-        RowRemovedId,
-        SourceChangedId,
-        TransformChangedId,
-        RangeChangedId,
-        IntensityChangedId,
-        DestinationChangedId,
-        RowEnablementChangedId
-    };
-
+    void setEffectsDestination(int fxProcessor, int effect);
 private:        
     void sourceMenu(int rowNumber);
     void transformMenu(int rowNumber);
     void rangeMenu(int rowNumber);
     void destinationMenu(int rowNumber);
     void initialiseSubMenus();
+
+    void initialiseStereoDelayMenu(PopupMenu &menu);
+    void initialisePingPongDelayMenu(PopupMenu &menu);
+    void initialiseLCRDelayMenu(PopupMenu &menu);
+    void initialiseStereoFlangerMenu(PopupMenu &menu);
+    void initialiseDimensionChorusMenu(PopupMenu &menu);
+    void initialiseHoldDelayMenu(PopupMenu &menu);
+    void initialiseDecimatorMenu(PopupMenu &menu);
+    void initialisePlateReverb(PopupMenu &menu);
 
     ModulationMatrix &modMatrix;
     std::vector<msm::MatrixRow> rows;
@@ -109,13 +108,15 @@ private:
     StringArray transform;
     StringArray destination;
 
+    int fxOneStartIndex;
+    int fxTwoStartIndex;
+
     /* Colours */
     Colour textColour;
 
     ScopedPointer<PopupMenu> menu;
 
     // DSP Signal Destination Menus
-    PopupMenu preAmpMenu;
     PopupMenu filterOneMenu;
     PopupMenu filterTwoMenu;
     PopupMenu waveshaperMenu;
@@ -126,8 +127,17 @@ private:
     PopupMenu envTwo;
     PopupMenu sseq;
 
+    //Fx Menu
     PopupMenu effectOneMenu;
     PopupMenu effectTwoMenu;
+
+    StringArray fxOneDestinations;
+    StringArray fxTwoDestinations;
+
+    //Stereo Delay
+    StringArray StereoDelayParams;
+    StringArray PingPongDelayParams;
+    StringArray LCRDelayParams;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MatrixTable)
 };

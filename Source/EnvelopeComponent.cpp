@@ -36,7 +36,9 @@
 //==============================================================================
 EnvelopeComponent::EnvelopeComponent (const String &name, AkatekoAudioProcessor &p, int env, Label &label)
     : Component::Component(name),
-      processor(p)
+      processor(p),
+      duration(nullptr),
+      labelRef(label)
 {
     //[Constructor_pre] You can add your own custom stuff here..
 
@@ -79,8 +81,12 @@ EnvelopeComponent::EnvelopeComponent (const String &name, AkatekoAudioProcessor 
 
     if(nrOfParams == 7){
         addAndMakeVisible (envEnableToggle = new ParamToggle(paramNames[0], *p.getParameters().getUnchecked(paramIndices [0]), label));
-        addAndMakeVisible (envSyncToggle = new ParamToggle(paramNames[1], *p.getParameters().getUnchecked(paramIndices[1]), label));
-        addAndMakeVisible (durationSlider = new ParamSlider(paramNames[2], *p.getParameters().getUnchecked(paramIndices[2]), label, 50.f, 5000.f));
+
+        addAndMakeVisible (envSyncToggle = new ParamToggle(paramNames[1], *p.getParameters().getUnchecked(paramIndices [0]), label));
+
+        addAndMakeVisible (durationSlider =new Slider(paramNames[2]));
+        duration = p.getParameters().getUnchecked(paramIndices[2]);
+
         addAndMakeVisible (envLoopSlider = new ParamSlider(paramNames[3], *p.getParameters().getUnchecked(paramIndices[3]), label, 1, 32));
         addAndMakeVisible (loopDirectionComboBox = new ParamComboBox(paramNames[4], *p.getParameters().getUnchecked(paramIndices[4]), label));
         addAndMakeVisible (susDirectionComboBox = new ParamComboBox(paramNames[5], *p.getParameters().getUnchecked(paramIndices[5]), label));
@@ -99,19 +105,20 @@ EnvelopeComponent::EnvelopeComponent (const String &name, AkatekoAudioProcessor 
 
     //[/Constructor_pre]
 
-
     //[UserPreSize]
     addAndMakeVisible (envelopeDrawing = new EnvelopeDrawing ("env"));
     envelopeDrawing->setName ("envelopeDrawing");
 
-    durationSlider->setRange (0, 1, 0);
+    durationSlider->setRange (50.f, 5000.f, 0);
     durationSlider->setSliderStyle (Slider::LinearHorizontal);
     durationSlider->setTextBoxStyle (Slider::NoTextBox, false, 80, 20);
+    durationSlider->addListener(this);
 
     envLoopSlider->setTooltip (TRANS("Loop amount"));
     envLoopSlider->setRange (0, 1, 0.03225806452);
     envLoopSlider->setSliderStyle (Slider::LinearHorizontal);
     envLoopSlider->setTextBoxStyle (Slider::NoTextBox, false, 80, 20);
+    envLoopSlider->addListener(this);
 
     addAndMakeVisible (triggerButton = new TextButton ("triggerButton"));
     triggerButton->setTooltip (TRANS("Trigger Envelope"));
@@ -128,7 +135,7 @@ EnvelopeComponent::EnvelopeComponent (const String &name, AkatekoAudioProcessor 
     nameLabel->setEditable (false, false, false);
     nameLabel->setColour (Label::textColourId, Colours::white);
     nameLabel->setColour (TextEditor::textColourId, Colours::black);
-    nameLabel->setColour (TextEditor::backgroundColourId, Colour (0x00000000));
+    nameLabel->setColour (TextEditor::backgroundColourId, Colour(0x00000000));
 
     addAndMakeVisible (releaseButton = new TextButton ("releaseButton"));
     releaseButton->setTooltip (TRANS("Enter Release Stage"));
@@ -143,6 +150,7 @@ EnvelopeComponent::EnvelopeComponent (const String &name, AkatekoAudioProcessor 
     loopDirectionComboBox->addItem (TRANS("normal"), 1);
     loopDirectionComboBox->addItem (TRANS("reverse"), 2);
     loopDirectionComboBox->addItem (TRANS("back&forth"), 3);
+    loopDirectionComboBox->postCommandMessage(ParamComboBox::update);
     loopDirectionComboBox->addListener (this);
 
     susDirectionComboBox->setTooltip (TRANS("Sustain direction"));
@@ -153,6 +161,7 @@ EnvelopeComponent::EnvelopeComponent (const String &name, AkatekoAudioProcessor 
     susDirectionComboBox->addItem (TRANS("normal"), 1);
     susDirectionComboBox->addItem (TRANS("reverse"), 2);
     susDirectionComboBox->addItem (TRANS("back&forth"), 3);
+    susDirectionComboBox->postCommandMessage(ParamComboBox::update);
     susDirectionComboBox->addListener (this);
 
     envSyncToggle->setTooltip (TRANS("sync"));
@@ -167,6 +176,7 @@ EnvelopeComponent::EnvelopeComponent (const String &name, AkatekoAudioProcessor 
     triggerComboBox->addItem (TRANS("MIDI"), 1);
     triggerComboBox->addItem (TRANS("Audio"), 2);
     triggerComboBox->addSeparator();
+    triggerComboBox->postCommandMessage(ParamComboBox::update);
     triggerComboBox->addListener (this);
     //[/UserPreSize]
 
@@ -194,8 +204,8 @@ EnvelopeComponent::~EnvelopeComponent()
     envSyncToggle = nullptr;
     triggerComboBox = nullptr;
 
-
     //[Destructor]. You can add your own custom destruction code here..
+    duration = nullptr;
     //[/Destructor]
 }
 
@@ -255,6 +265,60 @@ void EnvelopeComponent::resized()
     //[/UserResized]
 }
 
+void EnvelopeComponent::sliderValueChanged(Slider* sliderThatWasMoved)
+{
+    //[UsersliderValueChanged_Pre]
+    //[/UsersliderValueChanged_Pre]
+
+    if (sliderThatWasMoved == durationSlider)
+    {
+        //[UserSliderCode_durationSlider] -- add your slider handling code here..
+        String tmpName = durationSlider->getName();
+
+        if(envSyncToggle != nullptr && duration != nullptr){
+            const bool tmpSync = envSyncToggle->getToggleState();
+            if(tmpSync){
+                int tmpVal = durationSlider->getValue();
+
+                if(tmpVal < beatDivision.size() &&
+                   tmpVal < valueBeatDivision.size())
+                {
+                    double tmpDur = valueBeatDivision[tmpVal];
+                    tmpName += beatDivision[tmpVal];
+                    duration->setValue(tmpDur);
+                }
+            } else {
+                double tmpVal = durationSlider->getValue();
+                durationSlider->setRange(50.f, 5000.f);
+                duration->setValue(tmpVal);
+
+                if(envNumber == 1){
+
+                } else if(envNumber == 2){
+
+                }
+
+                tmpName += String(tmpVal);
+            }
+
+            labelRef.setText(tmpName, dontSendNotification);
+        }
+        //[/UserSliderCode_durationSlider]
+    }
+
+    //[UsersliderValueChanged_Post]
+    else if(sliderThatWasMoved == envLoopSlider){
+        if(envNumber == 1){
+            processor.updateEnvelopeOneLoopAmount();
+        } else if(envNumber == 2){
+            processor.updateEnvelopeTwoLoopAmount();
+        }
+    }
+
+
+    //[/UsersliderValueChanged_Post]
+}
+
 void EnvelopeComponent::buttonClicked (Button* buttonThatWasClicked)
 {
     //[UserbuttonClicked_Pre]
@@ -283,11 +347,53 @@ void EnvelopeComponent::buttonClicked (Button* buttonThatWasClicked)
     else if (buttonThatWasClicked == envSyncToggle)
     {
         //[UserButtonCode_envSyncToggle] -- add your button handler code here..
-        if(envNumber == 1){
+        double tmpDur = 0.0;
 
-        } else if(envNumber == 2){
+        if(duration != nullptr){
+            tmpDur = duration->getValue();
 
+            const bool tmpSync = envSyncToggle->getToggleState();
+            double tmpDur = duration->getValue();
+
+            if(tmpSync){
+                int tmpIndex = findClosestTimeDivision(tmpDur);
+
+                durationSlider->setRange(0, valueBeatDivision.size()-1);
+                durationSlider->setValue(tmpIndex, sendNotification);
+                duration->setValue(valueBeatDivision[tmpIndex]);
+
+                int last = valueBeatDivision.size()-1;
+
+                if(envNumber == 1){
+                    processor.setEnvelopeOneDurationBounds(valueBeatDivision[0],
+                                                           valueBeatDivision[last]);
+                } else if(envNumber == 2){
+                    processor.setEnvelopeTwoDurationBounds(valueBeatDivision[0],
+                                                           valueBeatDivision[last]);
+                }
+            } else {
+                if(tmpDur >= 5000.f){
+                    tmpDur = 5000.f;
+                }
+
+                if(tmpDur <= 50.f){
+                    tmpDur = 50.f;
+                }
+
+                durationSlider->setRange(50.f, 5000.f);
+                duration->setValue(tmpDur);
+                durationSlider->setValue(tmpDur, sendNotification);
+
+                if(envNumber == 1){
+                    processor.setEnvelopeOneDurationBounds(50.f, 5000.f);
+                } else if(envNumber == 2){
+                    processor.setEnvelopeTwoDurationBounds(50.f, 5000.f);
+                }
+            }
+        } else {
+            std::cerr << "Parameters not bound properly, duration not set : " << getName() << std::endl;
         }
+
         //[/UserButtonCode_envSyncToggle]
     }
 
@@ -354,6 +460,7 @@ void EnvelopeComponent::handleCommandMessage(int commandId){
 void EnvelopeComponent::updateEnvelope(int env){
     float startPos = 0.f;
     float endPos = 0.f;
+    envelopeDrawing->fillBuffer();
     msmBuffer buffer = envelopeDrawing->getBuffer();
 
     if(env == 1){
@@ -466,6 +573,114 @@ String EnvelopeComponent::getUIState(){
     return envelopeDrawing->toString();
 }
 
+void EnvelopeComponent::setBeatDivisionStrings(StringArray beatDivStr){
+    int steps = beatDivStr.size()-1;
+    beatDivision.clear();
+
+    /* Reverse Copy */
+    while(steps >= 0){
+        beatDivision.add(beatDivStr[steps]);
+        steps--;
+    }
+}
+
+void EnvelopeComponent::setBeatDivisionValues(vector<double> beatDivVal){
+    int steps = beatDivVal.size()-1;
+    valueBeatDivision.clear();
+
+    while(steps >= 0){
+        valueBeatDivision.push_back(beatDivVal[steps]);
+        steps--;
+    }
+}
+
+void EnvelopeComponent::initDurationSlider(){
+    if(duration != nullptr &&
+       envSyncToggle != nullptr &&
+       beatDivision.size() != 0 &&
+       valueBeatDivision.size() != 0)
+    {
+        double tmpDur = duration->getValue();
+        const bool tmpSync = envSyncToggle->getToggleState();
+
+        if(tmpSync){
+            int tmpIndex = findClosestTimeDivision(tmpDur);
+
+            durationSlider->setRange(0, valueBeatDivision.size()-1);
+            durationSlider->setValue(tmpIndex);
+        } else {
+            if(tmpDur >= 5000.f){
+                tmpDur = 5000.f;
+            }
+
+            if(tmpDur <= 50.f){
+                tmpDur = 50.f;
+            }
+
+            durationSlider->setRange(50.f, 5000.f);
+            durationSlider->setValue(tmpDur);
+        }
+    } else {
+        std::cout << "env generator" << std::endl;
+
+        if(duration == nullptr || envSyncToggle == nullptr){
+            std::cerr << "Parameter are not bound properly : " << getName() << std::endl;
+        }
+
+        if(beatDivision.size() == 0 || valueBeatDivision.size())
+        {
+            std::cerr << "Beat division tables not set properly : " << getName() << std::endl;
+        }
+    }
+}
+
+int EnvelopeComponent::findClosestTimeDivision(double period){
+    double tmpPeriod = period;
+    int result = 0;
+    int nrOfSteps = valueBeatDivision.size();
+
+    if(period != 0 && nrOfSteps != 0){
+        bool run = true;
+        int index = 1;
+
+        while(run && index < nrOfSteps-1){
+            double prev = valueBeatDivision[index-1];
+            double val = valueBeatDivision[index];
+            double next = valueBeatDivision[index+1];
+
+            if(val == tmpPeriod){
+                result = index;
+                run = false;
+            }
+
+            if(tmpPeriod >= prev && tmpPeriod < val){
+                result = index-1;
+                run = false;
+            }
+
+            if(tmpPeriod <= next && tmpPeriod > val ){
+                result = index+1;
+                run = false;
+            }
+
+            index +=3;
+        }
+    }
+    return result;
+}
+
+void EnvelopeComponent::updateGui(){
+    envEnableToggle->postCommandMessage(ParamToggle::update);
+    envSyncToggle->postCommandMessage(ParamToggle::update);
+
+    envLoopSlider->postCommandMessage(ParamSlider::update);
+    loopDirectionComboBox->postCommandMessage(ParamComboBox::update);
+    susDirectionComboBox->postCommandMessage(ParamComboBox::update);
+    triggerComboBox->postCommandMessage(ParamComboBox::update);
+
+    initDurationSlider();
+    updateEnvelope(envNumber);
+}
 //[/MiscUserCode]
 
 
@@ -500,7 +715,7 @@ BEGIN_JUCER_METADATA
           virtualName="Slider" explicitFocusOrder="0" pos="408 48 104 20"
           min="0" max="1" int="0" style="LinearHorizontal" textBoxPos="NoTextBox"
           textBoxEditable="1" textBoxWidth="80" textBoxHeight="20" skewFactor="1"
-          needsCallback="0"/>
+          needsCallback="1"/>
   <SLIDER name="loopAmount" id="ed354e636e331bd5" memberName="envLoopSlider"
           virtualName="Slider" explicitFocusOrder="0" pos="408 96 104 17"
           tooltip="Loop amount" min="0" max="1" int="0.03125" style="LinearHorizontal"

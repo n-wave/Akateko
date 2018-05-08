@@ -13,49 +13,85 @@
 using namespace akateko;
 
 AkatekoVoice::AkatekoVoice(AkatekoMatrix &matrix) :
-    filterOne(MoogLadderFilter(matrix.getReadRegister(DESTSRC::F1FREQ))),
-    filterTwo(MoogLadderFilter(matrix.getReadRegister(DESTSRC::F2FREQ))),
+    filterOne(MoogLadderFilter(matrix.getReadRegister(DESTSRC::F1DRIVE),
+                               matrix.getReadRegister(DESTSRC::F1PBG),
+                               matrix.getReadRegister(DESTSRC::F1FREQ),
+                               matrix.getReadRegister(DESTSRC::F1RESO))),
+
+    filterTwo(MoogLadderFilter(matrix.getReadRegister(DESTSRC::F2DRIVE),
+                               matrix.getReadRegister(DESTSRC::F2PBG),
+                               matrix.getReadRegister(DESTSRC::F2FREQ),
+                               matrix.getReadRegister(DESTSRC::F2RESO))),
+
+    waveShaper(WaveShaper(matrix.getReadRegister(DESTSRC::WSDRI),
+                          matrix.getReadRegister(DESTSRC::WSMIX))),
+
+    fOneVol(matrix.getReadRegister(DESTSRC::F1VOL)),
+    fTwoVol(matrix.getReadRegister(DESTSRC::F2VOL)),
+
     filtersEnabled(true),
     filterOneEnabled(true),
     filterTwoEnabled(true),
+    waveShaperEnabled(true),
+    filterOneVolume(0.0),
+    filterTwoVolume(0.0),
     filterConfig(1)
 {
     filterOne.setFilterType(MoogLadderFilter::BPF4);
     filterTwo.setFilterType(MoogLadderFilter::BPF4);
+
+    /*
+     * const double &dModIn,
+     * const double &pModIn,
+     * const double &fModIn,
+     * const double &rModIn
+     *
+     * const double &dModIn,
+     * const double &mModIn,
+     * const double &aModIn,
+     * const double &rModIn
+     *
+     */
 }
 
 void AkatekoVoice::setSampleRate(double sampleRate){
     filterOne.setSampleRate(sampleRate);
     filterTwo.setSampleRate(sampleRate);
+    waveShaper.setSampleRate(sampleRate);
 }
 
 void AkatekoVoice::update(){
     filterOne.update();
     filterTwo.update();
+    waveShaper.update();
 }
 
-void AkatekoVoice::getSample(double *sample){
-    double tmpSample = *sample;
+double AkatekoVoice::getSample(double input){
+    double tmpSample = input;
 
     if(filtersEnabled){
         if(filterConfig == 0){ //Series
 
             if(filterOneEnabled){
-                filterOne.getSample(&tmpSample);
+                tmpSample = filterOne.getSample(tmpSample);
+                //std::cout << "Filter One : " << tmpSample << std::endl;
+
             }
             if(filterTwoEnabled){
-                filterTwo.getSample(&tmpSample);
+                tmpSample = filterTwo.getSample(tmpSample);
+               // std::cout << "Filter Two : " << tmpSample << std::endl;
             }
 
-
         } else if(filterConfig == 1){ //parallel
+
+            //TODO fade In
             double tmpParalell = tmpSample;
 
             if(filterOneEnabled){
-                filterOne.getSample(&tmpSample);
+                tmpSample = filterOne.getSample(tmpSample);
             }
             if(filterTwoEnabled){
-                filterTwo.getSample(&tmpParalell);
+                tmpParalell = filterTwo.getSample(tmpParalell);
             }
 
             tmpSample += tmpParalell;
@@ -63,44 +99,10 @@ void AkatekoVoice::getSample(double *sample){
     }
 
     if(waveShaperEnabled){
-        waveShaper.getSample(&tmpSample);
+       tmpSample =  waveShaper.getSample(tmpSample);
     }
 
-    *sample = tmpSample;
-}
-
-void AkatekoVoice::getSample(float *sample){
-    float tmpSample = *sample;
-
-    if(filtersEnabled){
-        if(filterConfig == 0){ //Series
-
-            if(filterOneEnabled){
-                filterOne.getSample(&tmpSample);
-            }
-            if(filterTwoEnabled){
-                filterTwo.getSample(&tmpSample);
-            }
-
-
-        } else if(filterConfig == 1){ //parallel
-            float tmpParalell = tmpSample;
-
-            if(filterOneEnabled){
-                filterOne.getSample(&tmpSample);
-            }
-            if(filterTwoEnabled){
-                filterTwo.getSample(&tmpParalell);
-            }
-            tmpSample += tmpParalell;
-        }
-    }
-
-    if(waveShaperEnabled){
-        waveShaper.getSample(&tmpSample);
-    }
-
-    *sample = tmpSample;
+    return tmpSample;
 }
 
 // Filter Config
@@ -115,7 +117,7 @@ void AkatekoVoice::filterConfiguration(int config){
 // Filter One
 //==============================================================================
 void AkatekoVoice::enableFilterOne(bool enable){
-    filtersEnabled = enable;
+    filterOneEnabled = enable;
 }
 
 void AkatekoVoice::setFilterOneDrive(double drive){
@@ -134,6 +136,10 @@ void AkatekoVoice::setFilterOneResonance(double resonance){
     filterOne.setResonance(resonance);
 }
 
+void AkatekoVoice::setFilterOneVolume(double volume){
+    filterOneVolume = volume;
+}
+
 void AkatekoVoice::setFilterOneType(int type){
     filterOne.setFilterType(type);
 }
@@ -141,7 +147,7 @@ void AkatekoVoice::setFilterOneType(int type){
 // Filter Two
 //==============================================================================
 void AkatekoVoice::enableFilterTwo(bool enable){
-    filtersEnabled = enable;
+    filterTwoEnabled = enable;
 }
 
 void AkatekoVoice::setFilterTwoDrive(double drive){
@@ -158,6 +164,10 @@ void AkatekoVoice::setFilterTwoFrequency(double frequency){
 
 void AkatekoVoice::setFilterTwoResonance(double resonance){
     filterTwo.setResonance(resonance);
+}
+
+void AkatekoVoice::setFilterTwoVolume(double volume){
+    filterTwoVolume = volume;
 }
 
 void AkatekoVoice::setFilterTwoType(int type){
@@ -179,4 +189,5 @@ void AkatekoVoice::setWaveShaperMix(double mix){
 
 void AkatekoVoice::setWaveShaperBuffer(msmBuffer &buffer){
     waveShaper.setBuffer(buffer);
+    waveShaper.swapBuffer();
 }

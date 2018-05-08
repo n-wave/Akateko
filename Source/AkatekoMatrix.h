@@ -33,6 +33,9 @@ public:
     void setDestination(int destination, int id) override;
     void setTransform(int transform, int id) override;
 
+    String toString() override;
+    void restoreFromString(const String &matrix) override;
+
 private:
 
 };

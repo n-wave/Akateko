@@ -23,10 +23,13 @@
 //[Headers]     -- You can add your own extra header files here --
 #include "../JuceLibraryCode/JuceHeader.h"
 #include "PluginProcessor.h"
+#include "/work/programming-projects/msm/msm-gui/ParamImageToggle.h"
 #include "/work/programming-projects/msm/msm-gui/ParamSlider.h"
 #include "/work/programming-projects/msm/msm-gui/ParamToggle.h"
 #include "/work/programming-projects/msm/msm-gui/ParamComboBox.h"
 
+#include "CustomLookAndFeel.h"
+#include "SliderLookAndFeel.h"
 #include "StereoDelayComponent.h"
 #include "PingPongComponent.h"
 #include "LCRDelayComponent.h"
@@ -35,6 +38,7 @@
 #include "HoldDelayComponent.h"
 #include "DecimatorComponent.h"
 #include "PlateReverbComponent.h"
+
 //[/Headers]
 
 
@@ -69,6 +73,9 @@ public:
     int getActiveEffectProcessor(int effect);
 
     void updateGui();
+    void updateBeatsPerMinute();
+
+    void handleCommandMessage(int commandId) override;
     //[/UserMethods]
 
     void paint (Graphics& g) override;
@@ -77,17 +84,19 @@ public:
     void sliderValueChanged (Slider* sliderThatWasMoved) override;
     void buttonClicked (Button* buttonThatWasClicked) override;
 
-
-
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
     void initialiseEffectsStrings();
+    void handlePopupMenu(int choice, int param);
 
     AkatekoAudioProcessor &processor;
     Label &labelRef;
 
     AudioProcessorParameter *fxInput;
     AudioProcessorParameter *fxRouting;
+
+    std::vector<int>paramIndices;
+    int requestMenuIds[3];
 
     int activeEffect;
     int effectFXOne;
@@ -103,10 +112,16 @@ private:
     Colour activeColour;
 
     StringArray effects;
+
+    PopupMenu menu;
+
+    ScopedPointer<CustomLookAndFeel> claf;  // common laf
+
+
     //[/UserVariables]
 
     //==============================================================================
-    ScopedPointer<ToggleButton> enableFXToggleButton;
+    ScopedPointer<ImageButton> enableFXToggleButton;
     ScopedPointer<ComboBox> fxConfigComboBox;
     ScopedPointer<Slider> fxInputAmp;
     ScopedPointer<Slider> fxRoutingAmp;

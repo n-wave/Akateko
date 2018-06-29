@@ -1,3 +1,9 @@
+../../../msm/msm-dsp/Common/AudioTrigger.cpp
+../../../msm/msm-dsp/Common/AudioTrigger.h
+Source/ResonanceOptions.cpp
+Source/ResonanceOptions.h
+Source/XYPad.cpp
+Source/XYPad.h
 ../../../msm/msm-dsp/Common/AudioEffectProcessor.cpp
 ../../../msm/msm-dsp/Common/AudioEffectProcessor.h
 ../../../msm/msm-dsp/Common/AudioFilter.cpp
@@ -6,8 +12,6 @@
 ../../../msm/msm-dsp/Common/AudioGenerator.h
 ../../../msm/msm-dsp/Common/BeatDivisor.cpp
 ../../../msm/msm-dsp/Common/BeatDivisor.h
-../../../msm/msm-dsp/Common/ControlGenerator.cpp
-../../../msm/msm-dsp/Common/ControlGenerator.h
 ../../../msm/msm-dsp/Common/DelayLine.cpp
 ../../../msm/msm-dsp/Common/DelayLine.h
 ../../../msm/msm-dsp/Common/ExponentialCurve.cpp
@@ -74,8 +78,11 @@
 ../../../msm/msm-dsp/WaveShaping/FractionalDecimator.h
 ../../../msm/msm-dsp/WaveShaping/SampleRateReducer.cpp
 ../../../msm/msm-dsp/WaveShaping/SampleRateReducer.h
+../../../msm/msm-gui/AlterImageButton.cpp
 ../../../msm/msm-gui/NumberBox.cpp
 ../../../msm/msm-gui/NumberBox.h
+../../../msm/msm-gui/ParamImageToggle.cpp
+../../../msm/msm-gui/ParamImageToggle.h
 ../../../msm/msm-gui/XYPad.cpp
 ../../../msm/msm-gui/XYPad.h
 ../../../msm/msm-utilities/ConfigurationFileManager.cpp
@@ -88,6 +95,8 @@ Source/AkatekoMatrix.cpp
 Source/AkatekoMatrix.h
 Source/AkatekoVoice.cpp
 Source/AkatekoVoice.h
+Source/BackPanel.cpp
+Source/BackPanel.h
 Source/CustomLookAndFeel.cpp
 Source/CustomLookAndFeel.h
 Source/D-ChorusComponent.cpp
@@ -107,6 +116,11 @@ Source/LCRDelayComponent.cpp
 Source/LCRDelayComponent.h
 Source/MatrixTable.cpp
 Source/MatrixTable.h
+Source/MidiProcessor.h
+Source/MidiTable.cpp
+Source/MidiTable.h
+Source/MidiTableViewer.cpp
+Source/MidiTableViewer.h
 Source/ModulationMatrixComponent.cpp
 Source/PingPongComponent.cpp
 Source/PingPongComponent.h
@@ -116,6 +130,12 @@ Source/PresetComponent.cpp
 Source/PresetComponent.h
 Source/PresetTable.cpp
 Source/PresetTable.h
+Source/SliderLookAndFeel.cpp
+Source/SliderLookAndFeel.h
+Source/SliderLookAndFeelBottomV1.cpp
+Source/SliderLookAndFeelBottomV1.h
+Source/SliderLookAndFeelBottomV2.cpp
+Source/SliderLookAndFeelBottomV2.h
 Source/StereoDelayComponent.cpp
 Source/StereoDelayComponent.h
 Source/StereoFlangerComponent.cpp

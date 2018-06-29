@@ -26,85 +26,87 @@
 
 //[MiscUserDefs] You can add your own user definitions and misc code here...
 #include "/work/programming-projects/msm/msm-dsp/Common/msm.h"
+using akateko::initMidiRow;
+using akateko::MidiRow;
 
 //[UserDefs]
 
 //==============================================================================
 FilterComponent::FilterComponent (const String &name, AkatekoAudioProcessor &p, Label &label)
     : Component::Component(name),
-      filterOnePassBand(nullptr),
-      filterOneVolume(nullptr),
-      filterTwoPassBand(nullptr),
-      filterTwoVolume(nullptr),
       processor(p),
       labelRef(label)
 {
     //[Constructor_pre] You can add your own custom stuff here..
 
     const OwnedArray<AudioProcessorParameter> &params = p.getParameters();
-    vector<int> paramIndices = p.getParameterIndices(AkatekoAudioProcessor::FilterId);
+    paramIndices = p.getParameterIndices(AkatekoAudioProcessor::FilterId);
     StringArray paramIds = p.getParameterIds(AkatekoAudioProcessor::FilterId);
-
-    int nrOfParams = paramIndices.size();
 
     if(paramIndices.size() == 18 &&
        paramIds.size() == 18 &&
        params.size() >= paramIndices[17])
     {
-        addAndMakeVisible (filterToggleButton = new ParamToggle (paramIds[0], *params.getUnchecked(paramIndices[0]), label));
-        addAndMakeVisible (filterConfigComboBox = new ParamComboBox (paramIds[1], *params.getUnchecked(paramIndices[1]), label));
 
-        addAndMakeVisible (filterOneToggleButton = new ParamToggle (paramIds[2], *params.getUnchecked(paramIndices[2]), label));
+        //Store Command Id's
+        requestMenuIds[0] = paramIds[0].hash();
+        requestMenuIds[1] = paramIds[1].hash();
+        requestMenuIds[2] = paramIds[2].hash();
+        requestMenuIds[3] = paramIds[3].hash();
+        requestMenuIds[4] = paramIds[4].hash();
+        requestMenuIds[5] = paramIds[5].hash();
+        requestMenuIds[6] = paramIds[6].hash();
+        requestMenuIds[7] = paramIds[7].hash();
+        requestMenuIds[8] = paramIds[8].hash();
+        requestMenuIds[9] = paramIds[9].hash();
+        requestMenuIds[10] = paramIds[10].hash();
+        requestMenuIds[11] = paramIds[11].hash();
+        requestMenuIds[12] = paramIds[12].hash();
+        requestMenuIds[13] = paramIds[13].hash();
+        requestMenuIds[14] = paramIds[14].hash();
+        requestMenuIds[15] = paramIds[15].hash();
+        requestMenuIds[16] = paramIds[16].hash();
+        requestMenuIds[17] = paramIds[17].hash();
+
+        initialiseMidiStrings();
+
+        addAndMakeVisible (filterToggleButton = new ParamImageToggle (paramIds[0], *params.getUnchecked(paramIndices[0]), label));
+        addAndMakeVisible (filterConfigComboBox = new ParamComboBox (paramIds[1], *params.getUnchecked(paramIndices[1]), label));
+        // Filter One
+        addAndMakeVisible (filterOneToggleButton = new ParamImageToggle (paramIds[2], *params.getUnchecked(paramIndices[2]), label));
         addAndMakeVisible (filterOneTypeComboBox = new ParamComboBox (paramIds[3], *params.getUnchecked(paramIndices[3]), label));
         addAndMakeVisible (filterOneRollOffComboBox = new ParamComboBox (paramIds[4], *params.getUnchecked(paramIndices[4]), label));
-
         addAndMakeVisible (filterOneFrequencySlider = new ParamSlider (paramIds[5], *params.getUnchecked(paramIndices[5]), label, 20., 20000.));
-
         addAndMakeVisible (filterOneResonanceSlider = new ParamSlider (paramIds[6], *params.getUnchecked(paramIndices[6]), label));
-
-        addAndMakeVisible (filterOnePassBandSlider = new Slider (paramIds[7]));
-        filterOnePassBand = params.getUnchecked(paramIndices[7]);
-
+        addAndMakeVisible (filterOnePassBandSlider = new ParamSlider (paramIds[7], *params.getUnchecked(paramIndices[7]), label, true));
         addAndMakeVisible (filterOneDriveSlider = new ParamSlider(paramIds[8], *params.getUnchecked(paramIndices[8]),label));
-
-        addAndMakeVisible (filterOneVolumeSlider = new Slider (paramIds[9]));
-        filterOneVolume = params.getUnchecked(paramIndices[9]);
-
+        addAndMakeVisible (filterOneVolumeSlider = new ParamSlider(paramIds[9], *params.getUnchecked(paramIndices[9]), label, true));
         // Filter Two
-        addAndMakeVisible (filterTwoToggleButton = new ParamToggle (paramIds[10], *params.getUnchecked(paramIndices[10]), label));
+        addAndMakeVisible (filterTwoToggleButton = new ParamImageToggle (paramIds[10], *params.getUnchecked(paramIndices[10]), label));
         addAndMakeVisible (filterTwoTypeComboBox = new ParamComboBox (paramIds[11], *params.getUnchecked(paramIndices[11]), label));
         addAndMakeVisible (filterTwoRollOffComboBox = new ParamComboBox (paramIds[12], *params.getUnchecked(paramIndices[12]), label));
-
         addAndMakeVisible (filterTwoFrequencySlider = new ParamSlider (paramIds[13], *params.getUnchecked(paramIndices[13]), label, 20., 20000.));
         addAndMakeVisible (filterTwoResonanceSlider = new ParamSlider (paramIds[14], *params.getUnchecked(paramIndices[14]), label));
-
-        addAndMakeVisible (filterTwoPassBandSlider = new Slider(paramIds[15]));
-        filterTwoPassBand = params.getUnchecked(paramIndices[15]);
-
+        addAndMakeVisible (filterTwoPassBandSlider = new ParamSlider(paramIds[15], *params.getUnchecked(paramIndices[15]), label, true));
         addAndMakeVisible (filterTwoDriveSlider = new ParamSlider (paramIds[16], *params.getUnchecked(paramIndices[16]), label));
+        addAndMakeVisible (filterTwoVolumeSlider = new ParamSlider (paramIds[17], *params.getUnchecked(paramIndices[17]), label, true));
 
-        addAndMakeVisible (filterTwoVolumeSlider = new Slider (paramIds[17]));
-        filterTwoVolume = params.getUnchecked(paramIndices[17]);
+
+        proceed = true;
     } else{
-        addAndMakeVisible (filterToggleButton = new ToggleButton ("filterToggle"));
-        addAndMakeVisible (filterConfigComboBox = new ComboBox ("filterConfig"));
-
-        // Filter One
-        addAndMakeVisible (filterOneToggleButton = new ToggleButton ("filterOneToggle"));
+        addAndMakeVisible (filterToggleButton = new ImageButton ("filterToggle"));
+        addAndMakeVisible (filterConfigComboBox = new ComboBox ("filterConfig"));    
+        addAndMakeVisible (filterOneToggleButton = new ImageButton ("filterOneToggle")); // Filter One
         addAndMakeVisible (filterOneTypeComboBox = new ComboBox ("filterOneType"));
         addAndMakeVisible (filterOneRollOffComboBox = new ComboBox ("filterOneRollOff"));
-
         addAndMakeVisible (filterOneFrequencySlider = new Slider ("filterOneFrequency"));
         addAndMakeVisible (filterOneResonanceSlider = new Slider ("filterOneResonance"));
         addAndMakeVisible (filterOneDriveSlider = new Slider ("filterOneDrive"));
         addAndMakeVisible (filterOnePassBandSlider = new Slider ("filterOnePassBand"));
         addAndMakeVisible (filterOneVolumeSlider = new Slider ("filterOneVolumeSlider"));
-
-        // Filter Two
-        addAndMakeVisible (filterTwoToggleButton = new ToggleButton ("filterTwoToggle"));
+        addAndMakeVisible (filterTwoToggleButton = new ImageButton ("filterTwoToggle")); // Filter Two
         addAndMakeVisible (filterTwoTypeComboBox = new ComboBox ("filterTwoType"));
         addAndMakeVisible (filterTwoRollOffComboBox = new ComboBox ("filterTwoRollOff"));
-
         addAndMakeVisible (filterTwoFrequencySlider = new Slider ("filterTwoFrequency"));
         addAndMakeVisible (filterTwoResonanceSlider = new Slider ("filterTwoResonance"));
         addAndMakeVisible (filterTwoPassBandSlider = new Slider ("filterTwoPassBand"));
@@ -127,6 +129,8 @@ FilterComponent::FilterComponent (const String &name, AkatekoAudioProcessor &p, 
 
             index++;
         }
+
+        proceed = false;
     }
 
     addAndMakeVisible (filterDisplay = new FilterDisplay ("fdis"));
@@ -138,6 +142,11 @@ FilterComponent::FilterComponent (const String &name, AkatekoAudioProcessor &p, 
 
     /* Bypass/Enable Filter */
     filterToggleButton->setButtonText (String());
+    filterToggleButton->setImages(false, true, false,
+                                    ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour(0x7F000000),
+                                    ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour (0x4F20BFCF),
+                                    ImageCache::getFromMemory (BinaryData::ToggleOn_png, BinaryData::ToggleOn_pngSize), 1.0f, Colour (0x3F20BFCF));
+
     filterToggleButton->addListener(this);
 
     /* Serial/Paralell Filter */
@@ -170,26 +179,22 @@ FilterComponent::FilterComponent (const String &name, AkatekoAudioProcessor &p, 
     const double filterTwoFreq = filterTwoFrequencySlider->getValue();
     filterDisplay->setFrequency(filterTwoFreq, 2);
 
-    if(filterOnePassBand != nullptr){
-        const double tmpValue = filterOnePassBand->getValue();
-        filterOnePassBandSlider->setValue(tmpValue);
-    }
+    // Set ComboBox Look And Feel
 
-    if(filterOneVolume != nullptr){
-        const double tmpValue = filterOneVolume->getValue();
-        filterOneVolumeSlider->setValue(tmpValue, dontSendNotification);
-    }
+    // Set Colours filter Display
+    filterDisplay->setColour(FilterDisplay::backgroundColourId, Colour(Colours::black));
+    filterDisplay->setColour(FilterDisplay::outlineColourId, Colour(0xAA407050));
+    filterDisplay->setColour(FilterDisplay::pathColourId, Colour(0xBB78C0A0));
+    filterDisplay->setColour(FilterDisplay::ellipseColourId, Colour(0xFF60B090));
+    filterDisplay->setColour(FilterDisplay::highLightColourId, Colour(0x8F9AC9B0));
+    filterDisplay->setColour(FilterDisplay::overlayGradientTwoId, Colour(0x4F00FFDA));
+    filterDisplay->setColour(FilterDisplay::filterGradientOneId, Colour(0x7F70C099));
+   // ImageCache::getFromMemory(BinaryData::smoothValue100Values_png, BinaryData::smoothValue100Values_pngSize);
 
-    if(filterTwoPassBand != nullptr){
-        const double tmpValue = filterTwoPassBand->getValue();
-        filterTwoPassBandSlider->setValue(tmpValue, dontSendNotification);
-    }
-
-    if(filterTwoVolume != nullptr){
-        const double tmpValue = filterTwoVolume->getValue();
-        filterTwoVolumeSlider->setValue(tmpValue, dontSendNotification);
-    }
-
+    // Build Menu
+    menu.addItem(1, "learn", true, false, nullptr);
+    menu.addSeparator();
+    menu.addItem(0xFF, "clear");
     //[/Constructor]
 }
 
@@ -220,10 +225,6 @@ FilterComponent::~FilterComponent()
 
 
     //[Destructor]. You can add your own custom destruction code here..
-    filterOnePassBand = nullptr;
-    filterOneVolume = nullptr;
-    filterTwoPassBand = nullptr;
-    filterTwoVolume = nullptr;
     //[/Destructor]
 }
 
@@ -306,19 +307,26 @@ void FilterComponent::paint (Graphics& g)
 void FilterComponent::resized()
 {
     //[UserPreResize] Add your own custom resize code here..
+    filterDisplay->setBounds (22, 24, 297, 102);
+
+    filterConfigComboBox->setBounds (134, 128, 73, 16);
+    filterOneTypeComboBox->setBounds (24, 128, 55, 16);
+    filterOneRollOffComboBox->setBounds (79, 128, 55, 16);
+    filterTwoTypeComboBox->setBounds (207, 128, 55, 16);
+    filterTwoRollOffComboBox->setBounds (262, 128, 55, 16);
+
+
     //[/UserPreResize]
 
     filterTwoFrequencySlider->setBounds (200, 146, 50, 50);
     filterTwoResonanceSlider->setBounds (264, 146, 50, 50);
-    filterDisplay->setBounds (25, 24, 295, 104);
-    filterOneTypeComboBox->setBounds (25, 128, 55, 16);
-    filterOneRollOffComboBox->setBounds (80, 128, 55, 16);
-    filterToggleButton->setBounds (323, 0, 24, 24);
-    filterTwoTypeComboBox->setBounds (208, 128, 55, 16);
-    filterTwoRollOffComboBox->setBounds (264, 128, 55, 16);
-    filterOneToggleButton->setBounds (150, 152, 24, 24);
-    filterTwoToggleButton->setBounds (176, 152, 24, 24);
-    filterConfigComboBox->setBounds (136, 131, 72, 16);
+
+
+    filterToggleButton->setBounds (322, 3, 18, 18);
+
+    filterOneToggleButton->setBounds (150, 155, 16, 16);
+    filterTwoToggleButton->setBounds (176, 155, 16, 16);
+
     filterTwoDriveSlider->setBounds (232, 194, 50, 50);
     filterTwoPassBandSlider->setBounds (184, 202, 40, 40);
     filterTwoVolumeSlider->setBounds (288, 202, 40, 40);
@@ -366,64 +374,7 @@ void FilterComponent::sliderValueChanged (Slider* sliderThatWasMoved)
     }
 
     //[UsersliderValueChanged_Post]
-    else if(sliderThatWasMoved == filterOnePassBandSlider){
-        const double tmpPassBand = filterOnePassBandSlider->getValue();
-        const double dbVolume = msm::dbConversion(tmpPassBand);
 
-        const String tmpLabel = filterOnePassBandSlider->getName() +
-                                String(dbVolume, 2) +
-                                String("dB");
-
-        if(filterOnePassBand != nullptr){
-            filterOnePassBand->setValue(tmpPassBand);
-        }
-
-        labelRef.setText(tmpLabel, dontSendNotification);
-    }
-
-    else if(sliderThatWasMoved == filterOneVolumeSlider){
-        const double tmpVolume = filterOneVolumeSlider->getValue();
-        const double dbVolume = msm::dbConversion(tmpVolume);
-
-        const String tmpLabel = filterOneVolumeSlider->getName() +
-                                String(dbVolume, 2) +
-                                String("dB");
-
-        if(filterOneVolume != nullptr){
-            filterOneVolume->setValue(tmpVolume);
-        }
-
-        labelRef.setText(tmpLabel, dontSendNotification);
-    }
-
-    else if(sliderThatWasMoved == filterTwoPassBandSlider){
-        const double tmpVolume = filterTwoPassBandSlider->getValue();
-        const double dbVolume = msm::dbConversion(tmpVolume);
-
-        const String tmpLabel = filterTwoPassBandSlider->getName() +
-                                String(dbVolume, 2) +
-                                String("dB");
-
-        if(filterTwoPassBand != nullptr){
-            filterTwoPassBand->setValue(tmpVolume);
-        }
-
-        labelRef.setText(tmpLabel, dontSendNotification);
-    }
-
-    else if(sliderThatWasMoved == filterTwoVolumeSlider){
-        const double tmpVolume = filterTwoVolumeSlider->getValue();
-        const double dbVolume = msm::dbConversion(tmpVolume);
-
-        const String tmpLabel = filterTwoVolumeSlider->getName() +
-                                String(dbVolume, 2) +
-                                String("dB");
-        if(filterTwoVolume != nullptr){
-            filterTwoVolume->setValue(tmpVolume);
-        }
-
-        labelRef.setText(tmpLabel, dontSendNotification);
-    }
 
     //[/UsersliderValueChanged_Post]
 }
@@ -431,6 +382,7 @@ void FilterComponent::sliderValueChanged (Slider* sliderThatWasMoved)
 void FilterComponent::comboBoxChanged (ComboBox* comboBoxThatHasChanged)
 {
     //[UsercomboBoxChanged_Pre]
+
     //[/UsercomboBoxChanged_Pre]
 
     if (comboBoxThatHasChanged == filterOneTypeComboBox)
@@ -476,9 +428,7 @@ void FilterComponent::comboBoxChanged (ComboBox* comboBoxThatHasChanged)
 void FilterComponent::buttonClicked (Button* buttonThatWasClicked)
 {
     //[UserbuttonClicked_Pre]
-    if(buttonThatWasClicked == filterToggleButton){
-        processor.updateFiltersEnabled();
-    }
+
     //[/UserbuttonClicked_Pre]
 
     if (buttonThatWasClicked == filterOneToggleButton)
@@ -500,32 +450,6 @@ void FilterComponent::buttonClicked (Button* buttonThatWasClicked)
     //[/UserbuttonClicked_Post]
 }
 
-void FilterComponent::handleCommandMessage (int commandId)
-{
-    //[UserCode_handleCommandMessage] -- Add your code here...
-    switch(commandId){
-        case FilterDisplay::F1CH:
-            /* Send async so that the parameter is updated */
-
-              filterOneFrequencySlider->setValue(filterDisplay->getFrequency(1),
-                                                NotificationType::sendNotificationAsync);
-              filterOneResonanceSlider->setValue(filterDisplay->getResonance(1),
-                                                 NotificationType::sendNotificationAsync);
-            break;
-        case FilterDisplay::F2CH:
-            filterTwoFrequencySlider->setValue(filterDisplay->getFrequency(2),
-                                               NotificationType::sendNotificationAsync);
-            filterTwoResonanceSlider->setValue(filterDisplay->getResonance(2),
-                                               NotificationType::sendNotificationAsync);
-
-            break;
-    }
-
-    //getParentComponent()->postCommandMessage();
-
-    //[/UserCode_handleCommandMessage]
-}
-
 //[MiscUserCode] You can add your own definitions of your custom methods or any other code here...
 
 /* After constructing and initialising the GUI components
@@ -534,6 +458,11 @@ void FilterComponent::handleCommandMessage (int commandId)
 void FilterComponent::initialiseFilterOne(){
     // Filter one Enable
     filterOneToggleButton->setButtonText (String());
+    filterOneToggleButton->setImages(false, true, false,
+                                     ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour(0x7F000000),
+                                     ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour (0x4F20BFCF),
+                                     ImageCache::getFromMemory (BinaryData::ToggleOn_png, BinaryData::ToggleOn_pngSize), 1.0f, Colour (0x3F20BFCF));
+
     filterOneToggleButton->addListener (this);
 
     // Frequency filter one
@@ -580,18 +509,22 @@ void FilterComponent::initialiseFilterOne(){
     filterOnePassBandSlider->setRange (0, 1, 0);
     filterOnePassBandSlider->setSliderStyle (Slider::RotaryHorizontalDrag);
     filterOnePassBandSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
-    filterOnePassBandSlider->addListener(this);
 
     // Filter Volume
     filterOneVolumeSlider->setRange (0, 1, 0);
     filterOneVolumeSlider->setSliderStyle (Slider::RotaryHorizontalDrag);
     filterOneVolumeSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
-    filterOneVolumeSlider->addListener(this);
+    filterOneVolumeSlider->setSkewFactor(0.5f);
 }
 
 void FilterComponent::initialiseFilterTwo(){
     // filter two enable
     filterTwoToggleButton->setButtonText (String());
+    filterTwoToggleButton->setImages(false, true, false,
+                                     ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour(0x7F000000),
+                                     ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour (0x4F20BFCF),
+                                     ImageCache::getFromMemory (BinaryData::ToggleOn_png, BinaryData::ToggleOn_pngSize), 1.0f, Colour (0x3F20BFCF));
+
     filterTwoToggleButton->addListener (this);
 
     // filter two frequency slider
@@ -638,13 +571,12 @@ void FilterComponent::initialiseFilterTwo(){
     filterTwoPassBandSlider->setRange (0, 1, 0);
     filterTwoPassBandSlider->setSliderStyle (Slider::RotaryHorizontalDrag);
     filterTwoPassBandSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
-    filterTwoPassBandSlider->addListener(this);
 
     // Filter Two Volume
     filterTwoVolumeSlider->setRange (0, 1, 0);
     filterTwoVolumeSlider->setSliderStyle (Slider::RotaryHorizontalDrag);
     filterTwoVolumeSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
-    filterTwoVolumeSlider->addListener(this);
+    filterTwoVolumeSlider->setSkewFactor(0.5f);
 }
 
 void FilterComponent::setFilterType(int &selectedIndex, int filter){
@@ -698,6 +630,171 @@ void FilterComponent::updateGui(){
     filterTwoPassBandSlider->postCommandMessage(ParamSlider::update);
     filterTwoDriveSlider->postCommandMessage(ParamSlider::update);
     filterTwoVolumeSlider->postCommandMessage(ParamSlider::update);
+}
+
+void FilterComponent::setLookAndFeel(LookAndFeel *cLaf, LookAndFeel *bLaf, LookAndFeel *sLaf){
+    filterConfigComboBox->setLookAndFeel(cLaf);
+    filterOneTypeComboBox->setLookAndFeel(cLaf);
+    filterOneRollOffComboBox->setLookAndFeel(cLaf);
+    filterTwoRollOffComboBox->setLookAndFeel(cLaf);
+    filterTwoTypeComboBox->setLookAndFeel(cLaf);
+
+
+    filterOneFrequencySlider->setLookAndFeel(bLaf);
+    filterOneResonanceSlider->setLookAndFeel(bLaf);
+    filterOneDriveSlider->setLookAndFeel(bLaf);
+
+    filterOnePassBandSlider->setLookAndFeel(sLaf);
+    filterOneVolumeSlider->setLookAndFeel(sLaf);
+
+    filterTwoFrequencySlider->setLookAndFeel(bLaf);
+    filterTwoResonanceSlider->setLookAndFeel(bLaf);
+    filterTwoDriveSlider->setLookAndFeel(bLaf);
+
+    filterTwoPassBandSlider->setLookAndFeel(sLaf);
+    filterTwoVolumeSlider->setLookAndFeel(sLaf);
+
+    menu.setLookAndFeel(cLaf);
+}
+
+//Not using but leave in for more easy acces
+void FilterComponent::initialiseMidiStrings(){
+    midiStrings.clear();
+
+    midiStrings.add(" Filters: Enable");
+    midiStrings.add(" Filters: config");
+    midiStrings.add(" Filters 1: Enable");
+    midiStrings.add(" Filters 1: Type");
+    midiStrings.add(" Filters 1: Roll Off");
+    midiStrings.add(" Filters 1 Freq");
+    midiStrings.add(" Filter 1: Reso");
+    midiStrings.add(" Filter 1: PBG");
+    midiStrings.add(" Filter 1: Drive");
+    midiStrings.add(" Filter 1: Vol");
+    midiStrings.add(" Filter 2: Enable");
+    midiStrings.add(" Filter 2: Type");
+    midiStrings.add(" Filter 2: Roll Off");
+    midiStrings.add(" Filter 2: Freq");
+    midiStrings.add(" Filter 2: Reso");
+    midiStrings.add(" Filter 2: PGB");
+    midiStrings.add(" Filter 2: Drive");
+    midiStrings.add(" Filter 2: Vol");
+}
+
+
+void FilterComponent::handleCommandMessage (int commandId)
+{
+    //[UserCode_handleCommandMessage] -- Add your code here...
+    switch(commandId){
+        case FilterDisplay::F1CH:
+            /* Send async so that the parameter is updated */
+
+            filterOneFrequencySlider->setValue(filterDisplay->getFrequency(1),
+                                               NotificationType::sendNotificationAsync);
+            filterOneResonanceSlider->setValue(filterDisplay->getResonance(1),
+                                               NotificationType::sendNotificationAsync);
+            break;
+        case FilterDisplay::F2CH:
+            filterTwoFrequencySlider->setValue(filterDisplay->getFrequency(2),
+                                               NotificationType::sendNotificationAsync);
+            filterTwoResonanceSlider->setValue(filterDisplay->getResonance(2),
+                                               NotificationType::sendNotificationAsync);
+            break;
+    }
+
+    if(paramIndices.size() == 18 &&
+       midiStrings.size() == 18)
+    {
+        int index = -1;
+        int param = -1;
+        int handling = - 1;
+        double minValue = 0.0;
+        double maxValue = 1.0;
+
+        if(commandId == requestMenuIds[0]){ // Filters Enables
+            index = menu.show();
+            param = 0;
+            handling = akateko::MIDI_TO_INT_TOGGLE;
+        } else if(commandId == requestMenuIds[2]){ // Filter One Enable
+            index = menu.show();
+            param = 2;
+            handling = akateko::MIDI_TO_INT_TOGGLE;
+        } else if(commandId == requestMenuIds[3]){ // Filter One Type
+            index = menu.show();
+            param = 3;
+            maxValue = 2;
+            handling = akateko::MIDI_TO_INT;
+        } else if(commandId == requestMenuIds[4]){ // Filter One RollOff
+            index = menu.show();
+            param = 4;
+            handling = akateko::MIDI_TO_INT;
+        } else if(commandId == requestMenuIds[5]){ // Filter One Frequency
+            index = menu.show();
+            param = 5;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuIds[6]){ //Filter One Reso
+            index = menu.show();
+            param = 6;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuIds[7]){ // Filter One PBG
+            index = menu.show();
+            param = 7;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuIds[8]){ // Filter One Drive
+            index = menu.show();
+            param = 8;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuIds[9]){ // Filter One Volume
+            index = menu.show();
+            param = 9;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuIds[10]){ //Filter Two Enable
+            index = menu.show();
+            param = 10;
+            handling = akateko::MIDI_TO_INT_TOGGLE;
+        } else if(commandId == requestMenuIds[11]){ //Filter Two type
+            index = menu.show();
+            param = 11;
+            maxValue = 2;
+            handling = akateko::MIDI_TO_INT;
+        } else if(commandId == requestMenuIds[12]){ //Filter Two Rolloff
+            index = menu.show();
+            param = 12;
+            handling = akateko::MIDI_TO_INT;
+        } else if(commandId == requestMenuIds[13]){ //Filter Two Frequency
+            index = menu.show();
+            param = 13;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuIds[14]){ //Filter Two Resonance
+            index = menu.show();
+            param = 14;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuIds[15]){ //Filter Two PBG
+            index = menu.show();
+            param = 15;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuIds[16]){ //Filter Two Drive
+            index = menu.show();
+            param = 16;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuIds[17]){ //Filter Two Volume
+            index = menu.show();
+            param = 17;
+            handling = akateko::MIDI_TO_DOUBLE;
+        }
+        if(index == 1){
+            MidiRow tmpRow;
+            initMidiRow(tmpRow, param, 0, 127, minValue, maxValue, paramIndices[param], handling, midiStrings[param],1);
+            processor.initiateMidiLearn(tmpRow);
+        } else if(index == 0xFF){
+            processor.removeMidiRow(paramIndices[param]);
+
+            String message = midiStrings[param] + String(" cleared");
+            labelRef.setText(message, sendNotificationAsync);
+        }
+    }
+
+    //[/UserCode_handleCommandMessage]
 }
 
 //[/MiscUserCode]
@@ -766,10 +863,10 @@ BEGIN_JUCER_METADATA
             virtualName="ComboBox" explicitFocusOrder="0" pos="80 128 55 16"
             editable="0" layout="36" items="12DB&#10;24DB&#10;" textWhenNonSelected="R-Off"
             textWhenNoItems="(no choices)"/>
-  <TOGGLEBUTTON name="filterToggle" id="9b43f7cd0d304fd2" memberName="filterToggleButton"
-                virtualName="ToggleButton" explicitFocusOrder="0" pos="323 0 24 24"
-                buttonText="" connectedEdges="0" needsCallback="0" radioGroupId="0"
-                state="1"/>
+  <IMAGEBUTTON name="filterToggle" id="9b43f7cd0d304fd2" memberName="filterToggleButton"
+               virtualName="ToggleButton" explicitFocusOrder="0" pos="323 0 24 24"
+               buttonText="" connectedEdges="0" needsCallback="0" radioGroupId="0"
+               state="1"/>
   <COMBOBOX name="filterTwoType" id="a5843f8fa9a567a" memberName="filterTwoTypeComboBox"
             virtualName="ComboBox" explicitFocusOrder="0" pos="208 128 55 16"
             editable="0" layout="36" items="LPF&#10;HPF&#10;BPF&#10;" textWhenNonSelected="Type"
@@ -778,11 +875,11 @@ BEGIN_JUCER_METADATA
             virtualName="ComboBox" explicitFocusOrder="0" pos="264 128 55 16"
             editable="0" layout="36" items="12DB&#10;24DB&#10;" textWhenNonSelected="R-Off"
             textWhenNoItems="(no choices)"/>
-  <TOGGLEBUTTON name="filterOneToggle" id="aa716bba60e2a8a" memberName="filterOneToggleButton"
+  <IMAGEBUTTON name="filterOneToggle" id="aa716bba60e2a8a" memberName="filterOneToggleButton"
                 virtualName="ToggleButton" explicitFocusOrder="0" pos="150 152 24 24"
                 buttonText="" connectedEdges="0" needsCallback="1" radioGroupId="0"
                 state="0"/>
-  <TOGGLEBUTTON name="filterTwoToggle" id="6d0d6cec75cecab1" memberName="filterTwoToggleButton"
+  <IMAGEBUTTON name="filterTwoToggle" id="6d0d6cec75cecab1" memberName="filterTwoToggleButton"
                 virtualName="ToggleButton" explicitFocusOrder="0" pos="176 152 24 24"
                 buttonText="" connectedEdges="0" needsCallback="1" radioGroupId="0"
                 state="0"/>

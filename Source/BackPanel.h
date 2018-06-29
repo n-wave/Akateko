@@ -17,17 +17,14 @@
   ==============================================================================
 */
 
-#ifndef __JUCE_HEADER_8D91CCEF57955C4__
-#define __JUCE_HEADER_8D91CCEF57955C4__
+#ifndef __JUCE_HEADER_E2A166DCAA82AB0E__
+#define __JUCE_HEADER_E2A166DCAA82AB0E__
 
 //[Headers]     -- You can add your own extra header files here --
 #include "../JuceLibraryCode/JuceHeader.h"
-#include "CustomLookAndFeel.h"
 #include "PluginProcessor.h"
-#include "PresetTable.h"
-#include "Akateko.h"
-
-
+#include "MidiTable.h"
+#include "ResonanceOptions.h"
 //[/Headers]
 
 
@@ -40,76 +37,77 @@
     Describe your class and how it works here!
                                                                     //[/Comments]
 */
-class PresetComponent  : public Component,
-                         public ButtonListener,
-                         public TextEditorListener
+class BackPanel  : public Component,
+                   public ButtonListener,
+                   public ComboBoxListener
 {
 public:
     //==============================================================================
-    PresetComponent (const String &name, AkatekoAudioProcessor &p, Label &prstLabel, Label &prmLabel );
-    ~PresetComponent();
+    BackPanel (AkatekoAudioProcessor &p);
+    ~BackPanel();
 
     //==============================================================================
     //[UserMethods]     -- You can add your own custom methods in this section.
-    void setUpdateCommandId(int id);
 
-    void handleCommandMessage(int commandId) override;
+    void setLookAndFeel(LookAndFeel *cLaf, LookAndFeel *sLaf);
+    void visibilityChanged() override;
 
-    void textEditorEscapeKeyPressed(TextEditor &tEdit) override;
-    void textEditorReturnKeyPressed(TextEditor &tEdit) override;
-    void textEditorFocusLost(TextEditor &tEdit) override;
-
-    void setLookAndFeel(LookAndFeel *laf);
     //[/UserMethods]
 
     void paint (Graphics& g) override;
     void resized() override;
     void buttonClicked (Button* buttonThatWasClicked) override;
+    void comboBoxChanged (ComboBox* comboBoxThatHasChanged) override;
+
+
+
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
-    int updateCommandId;
+    void selectEffectTable(int fx);
+    void setPresetDirectoryLabel(String directory);
+
+    int activeSection;
+
+    String currentDirectory;
+    int currentOverSampling;
 
     AkatekoAudioProcessor &processor;
-    Label &presetLabel;
-    Label &paramLabel;
-
-    int activeSort;
-    bool nameSort;
-    bool categorySort;
-    bool authorSort;
-
-    Colour buttonColour;
-    Colour activeColour;
-
-    enum Sort {
-       NameSort = 0,
-       CategorySort = 1,
-       AuthorSort = 2
-    };
-
-    void SortPresets(int sorting);
+    Label label;
     //[/UserVariables]
 
     //==============================================================================
-    ScopedPointer<TextButton> loadButton;
-    ScopedPointer<TextButton> saveButton;
-    ScopedPointer<TextButton> clearButton;
-    ScopedPointer<PresetTable> presetTableComponent;
-    ScopedPointer<Label> nameLabel;
-    ScopedPointer<TextButton> saveAsButton;
-    ScopedPointer<TextButton> deleteButton;
-    ScopedPointer<TextButton> sortNameButton;
-    ScopedPointer<TextButton> sortCategoryButton;
-    ScopedPointer<TextButton> sortAuthorButton;
-    ScopedPointer<TextButton> folderButton;
-    ScopedPointer<TextEditor> textEditor;
+    ScopedPointer<TextButton> globalTextButton;
+    ScopedPointer<TextButton> filtersTextButton;
+    ScopedPointer<TextButton> waveShaperTextButton;
+    ScopedPointer<TextButton> lfoOneTextButton;
+    ScopedPointer<TextButton> lfoTwoTextButton;
+    ScopedPointer<TextButton> envOneTextButton;
+    ScopedPointer<TextButton> envTwoTextButton;
+    ScopedPointer<TextButton> stepSeqTextButton;
+    ScopedPointer<TextButton> xyPadButton;
+    ScopedPointer<TextButton> fxOneTextButton;
+    ScopedPointer<TextButton> fxTwoTextButton;
+    ScopedPointer<MidiTable> midiTable;
+    ScopedPointer<TextButton> activeTextButton;
+    ScopedPointer<TextButton> clearAllTextButton;
+    ScopedPointer<TextButton> clearTextButton;
+    ScopedPointer<Slider> thresholdSlider;
+    ScopedPointer<Slider> preDelaySlider;
+    ScopedPointer<Slider> holdDelaySlider;
+    ScopedPointer<ComboBox> inputComboBox;
+    ScopedPointer<ResonanceOptions> resonanceOptions;
+    ScopedPointer<Label> presetFolderLabel;
+    ScopedPointer<TextButton> selectFolderButton;
+    ScopedPointer<ComboBox> overSamplingComboBox;
+    ScopedPointer<Label> sectionLabel;
+    ScopedPointer<Slider> preGainSlider;
 
 
     //==============================================================================
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PresetComponent)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BackPanel)
 };
 
 //[EndFile] You can add extra defines here...
 //[/EndFile]
 
-#endif   // __JUCE_HEADER_8D91CCEF57955C4__
+#endif   // __JUCE_HEADER_E2A166DCAA82AB0E__

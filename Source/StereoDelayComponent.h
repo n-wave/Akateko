@@ -22,9 +22,11 @@
 
 //[Headers]     -- You can add your own extra header files here --
 #include "../JuceLibraryCode/JuceHeader.h"
+#include "CustomLookAndFeel.h"
+#include "SliderLookAndFeel.h"
 #include "PluginProcessor.h"
 #include "/work/programming-projects/msm/msm-gui/ParamSlider.h"
-#include "/work/programming-projects/msm/msm-gui/ParamToggle.h"
+#include "/work/programming-projects/msm/msm-gui/ParamImageToggle.h"
 
 #include <vector>
 //[/Headers]
@@ -35,7 +37,6 @@
 /**
                                                                     //[Comments]
     An auto-generated component, created by the Projucer.
-
     Describe your class and how it works here!
                                                                     //[/Comments]
 */
@@ -50,9 +51,6 @@ public:
 
     //==============================================================================
     //[UserMethods]     -- You can add your own custom methods in this section.
-    enum commandIds{
-        update
-    };
 
     void handleCommandMessage(int commandId) override;
     void calculateTimeDivision(double bpm);
@@ -66,18 +64,33 @@ public:
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
     void initialiseTimeDivisions();
+
+    int getTimeDivisionIndex(std::vector<double> values, double time);
     int findClosestTimeDivision(double time);
     void updateSliderRange(Button *toggle, Slider *slider, AudioProcessorParameter *param);
     void updateSliderValue(Button *toggle, Slider *slider, AudioProcessorParameter *param);
+    void initialiseMidiStrings();
 
     AudioProcessorParameter *leftDelay;
     AudioProcessorParameter *rightDelay;
 
     StringArray division;
     std::vector<double> timeDivision;
+    std::vector<int> paramIndices;
+    int requestMenuIds[10];
+    StringArray midiStrings;
+
+    PopupMenu menu;
 
     AkatekoAudioProcessor &processor;
     Label &labelRef;
+
+    ScopedPointer<CustomLookAndFeel>claf;
+    ScopedPointer<SliderLookAndFeel>blaf;
+    ScopedPointer<SliderLookAndFeel> fblaf;
+
+
+    double beatsPerMinute;
     //[/UserVariables]
 
     //==============================================================================
@@ -87,10 +100,10 @@ private:
     ScopedPointer<Slider> leftFBSlider;
     ScopedPointer<Slider> crossSlider;
     ScopedPointer<Slider> mixSlider;
-    ScopedPointer<ToggleButton> enableToggle;
-    ScopedPointer<ToggleButton> leftSyncToggle;
-    ScopedPointer<ToggleButton> rightSyncToggle;
-    ScopedPointer<ToggleButton> crossEnabledToggle;
+    ScopedPointer<ImageButton> enableToggle;
+    ScopedPointer<ImageButton> leftSyncToggle;
+    ScopedPointer<ImageButton> rightSyncToggle;
+    ScopedPointer<ImageButton> crossEnabledToggle;
 
 
     //==============================================================================

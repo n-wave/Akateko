@@ -24,6 +24,15 @@
 
 
 //[MiscUserDefs] You can add your own user definitions and misc code here...
+#include "Akateko.h"
+
+using akateko::updateFxBPM;
+using akateko::updateFxGUI;
+using akateko::delay_timing_ratios;
+using akateko::initMidiRow;
+using akateko::IgnoreRightClick;
+using akateko::MidiRow;
+
 using std::vector;
 
 //[/MiscUserDefs]
@@ -31,6 +40,7 @@ using std::vector;
 //==============================================================================
 PingPongComponent::PingPongComponent (const String &name, AkatekoAudioProcessor &p, Label &label)
     : Component::Component(name),
+      beatsPerMinute(120.0),
       processor(p),
       labelRef(label)
 {
@@ -54,7 +64,7 @@ PingPongComponent::PingPongComponent (const String &name, AkatekoAudioProcessor 
      * 10
      */
 
-    vector<int> paramIndices = p.getParameterIndices(AkatekoAudioProcessor::PingPongDelayId);
+    paramIndices = p.getParameterIndices(AkatekoAudioProcessor::PingPongDelayId);
     StringArray paramIds = p.getParameterIds(AkatekoAudioProcessor::PingPongDelayId);
     const OwnedArray<AudioProcessorParameter> &params = p.getParameters();
 
@@ -69,33 +79,47 @@ PingPongComponent::PingPongComponent (const String &name, AkatekoAudioProcessor 
     }
 
     if(proceed){
-        addAndMakeVisible (enableToggle = new ParamToggle(paramIds[0], *params.getUnchecked(paramIndices[0]), label));
-        addAndMakeVisible (leftSyncToggle = new ParamToggle(paramIds[1], *params.getUnchecked(paramIndices[1]), label));
+        requestMenuId[0] = paramIds[0].hash();
+        requestMenuId[1] = paramIds[1].hash();
+        requestMenuId[2] = paramIds[2].hash();
+        requestMenuId[3] = paramIds[3].hash();
+        requestMenuId[4] = paramIds[4].hash();
+        requestMenuId[5] = paramIds[5].hash();
+        requestMenuId[6] = paramIds[6].hash();
+        requestMenuId[7] = paramIds[7].hash();
+        requestMenuId[8] = paramIds[8].hash();
 
+        initialiseMidiStrings();
+
+        addAndMakeVisible (enableToggle = new ParamImageToggle(paramIds[0], *params.getUnchecked(paramIndices[0]), label));
+        addAndMakeVisible (leftSyncToggle = new ParamImageToggle(paramIds[1], *params.getUnchecked(paramIndices[1]), label));
         // Left Delay Slider
-        addAndMakeVisible (leftDelaySlider = new Slider(paramIds[2]));
+        addAndMakeVisible (leftDelaySlider = new IgnoreRightClick<Slider>(paramIds[2]));
         leftDelay = params.getUnchecked(paramIndices[2]);
 
         addAndMakeVisible (leftFBSlider = new ParamSlider(paramIds[3], *params.getUnchecked(paramIndices[3]), label, -1.f, 1.f));
         addAndMakeVisible (leftMixSlider = new ParamSlider (paramIds[4], *params.getUnchecked(paramIndices[4]), label));
 
-        addAndMakeVisible (rightSyncToggle = new ParamToggle (paramIds[5], *params.getUnchecked(paramIndices[5]), label));
+        addAndMakeVisible (rightSyncToggle = new ParamImageToggle (paramIds[5], *params.getUnchecked(paramIndices[5]), label));
 
         // Left Right Slider
-        addAndMakeVisible (rightDelaySlider = new Slider (paramIds[6]));
+        addAndMakeVisible (rightDelaySlider = new IgnoreRightClick<Slider> (paramIds[6]));
         rightDelay = params.getUnchecked(paramIndices[6]);
 
         addAndMakeVisible (rightFBSlider = new ParamSlider (paramIds[7], *params.getUnchecked(paramIndices[7]), label, -1.f, 1.f));
         addAndMakeVisible (rightMixSlider = new ParamSlider (paramIds[8], *params.getUnchecked(paramIndices[8]), label));
-    } else {
-       addAndMakeVisible (enableToggle = new ToggleButton ("enableToggle"));
 
-       addAndMakeVisible (leftSyncToggle = new ToggleButton ("leftSyncToggle"));
+        //std::cout << "PP L-Delay" << paramIndices[2] << std::endl;
+        //std::cout << "PP R-Delay" << paramIndices[6] << std::endl;
+    } else {
+       addAndMakeVisible (enableToggle = new ImageButton ("enableToggle"));
+
+       addAndMakeVisible (leftSyncToggle = new ImageButton ("leftSyncToggle"));
        addAndMakeVisible (leftDelaySlider = new Slider ("leftDelaySlider"));
        addAndMakeVisible (leftFBSlider = new Slider ("leftFBSlider"));
        addAndMakeVisible (leftMixSlider = new Slider ("leftMixSlider"));
 
-       addAndMakeVisible (rightSyncToggle = new ToggleButton ("rightSyncToggle"));
+       addAndMakeVisible (rightSyncToggle = new ImageButton ("rightSyncToggle"));
        addAndMakeVisible (rightDelaySlider = new Slider ("rightDelaySlider"));
        addAndMakeVisible (rightFBSlider = new Slider ("rightFBSlider"));
        addAndMakeVisible (rightMixSlider = new Slider ("rightMixSlider"));
@@ -125,53 +149,91 @@ PingPongComponent::PingPongComponent (const String &name, AkatekoAudioProcessor 
 
     //[/Constructor_pre]
 
-
-
-
     //[UserPreSize]
+    const Image bigRotary = ImageCache::getFromMemory(BinaryData::AkatekoBigV3_png, BinaryData::AkatekoBigV3_pngSize);
+    const Image fbRotary = ImageCache::getFromMemory(BinaryData::PanBig_png, BinaryData::PanBig_pngSize);
+
+    claf = new CustomLookAndFeel();
+    blaf = new SliderLookAndFeel(bigRotary);
+    fblaf = new SliderLookAndFeel(fbRotary);
+
+    menu.setLookAndFeel(claf);
+
     leftDelaySlider->setRange (0, 1, 0);
     leftDelaySlider->setSliderStyle (Slider::RotaryHorizontalDrag);
     leftDelaySlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
+    leftDelaySlider->setLookAndFeel(blaf);
     leftDelaySlider->addListener (this);
 
     rightDelaySlider->setRange (0, 1, 0);
     rightDelaySlider->setSliderStyle (Slider::RotaryHorizontalDrag);
     rightDelaySlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
+    rightDelaySlider->setLookAndFeel(blaf);
     rightDelaySlider->addListener (this);
 
     rightFBSlider->setRange (0, 1, 0);
     rightFBSlider->setSliderStyle (Slider::RotaryHorizontalDrag);
     rightFBSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
+    rightFBSlider->setLookAndFeel(fblaf);
     rightFBSlider->setDoubleClickReturnValue(true, 0.5);
 
     leftFBSlider->setRange (0, 1, 0);
     leftFBSlider->setSliderStyle (Slider::RotaryHorizontalDrag);
     leftFBSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
+    leftFBSlider->setLookAndFeel(fblaf);
     leftFBSlider->setDoubleClickReturnValue(true, 0.5);
 
     leftMixSlider->setRange (0, 1, 0);
     leftMixSlider->setSliderStyle (Slider::RotaryHorizontalDrag);
     leftMixSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
-
-    enableToggle->setButtonText (String());
-    enableToggle->addListener (this);
-
-    leftSyncToggle->addListener (this);
-
-    rightSyncToggle->addListener (this);
+    leftMixSlider->setLookAndFeel(blaf);
 
     rightMixSlider->setRange (0, 1, 0);
     rightMixSlider->setSliderStyle (Slider::RotaryHorizontalDrag);
     rightMixSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
     rightMixSlider->setDoubleClickReturnValue(true, 0.5);
+    rightMixSlider->setLookAndFeel(blaf);
     //[/UserPreSize]
+
+    enableToggle->setButtonText (String());
+    enableToggle->setImages(false, true, false,
+                            ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour(0x7F000000),
+                            ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour (0x4F20BFCF),
+                            ImageCache::getFromMemory (BinaryData::ToggleOn_png, BinaryData::ToggleOn_pngSize), 1.0f, Colour (0x3F20BFCF));
+
+    enableToggle->addListener (this);
+
+    leftSyncToggle->setImages(false, true, false,
+                              ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour(0x7F000000),
+                              ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour (0x4F20BFCF),
+                              ImageCache::getFromMemory (BinaryData::ToggleOn_png, BinaryData::ToggleOn_pngSize), 1.0f, Colour (0x3F20BFCF));
+    leftSyncToggle->addListener (this);
+
+    rightSyncToggle->addListener (this);
+    rightSyncToggle->setImages(false, true, false,
+                               ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour(0x7F000000),
+                               ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour (0x4F20BFCF),
+                               ImageCache::getFromMemory (BinaryData::ToggleOn_png, BinaryData::ToggleOn_pngSize), 1.0f, Colour (0x3F20BFCF));
 
     setSize (255, 232);
 
 
     //[Constructor] You can add your own custom stuff here..
+    double bpm = processor.getBeatsPerMinute();
+
+    if(bpm < 20.0){
+        bpm = 20.0;
+    }
+
+    beatsPerMinute = bpm;
+
     initialiseTimeDivisions();
-    calculateTimeDivision(120.0);
+    calculateTimeDivision(beatsPerMinute);
+
+    menu.addItem(1, "learn");
+    menu.addSeparator();
+    menu.addItem(0xFF, "clear");
+
     //[/Constructor]
 }
 
@@ -194,6 +256,8 @@ PingPongComponent::~PingPongComponent()
     //[Destructor]. You can add your own custom destruction code here..
     leftDelay = nullptr;
     rightDelay = nullptr;
+    blaf = nullptr;
+    claf = nullptr;
     //[/Destructor]
 }
 
@@ -253,10 +317,11 @@ void PingPongComponent::resized()
     rightFBSlider->setBounds (99, 136, 60, 60);
     leftFBSlider->setBounds (99, 40, 60, 60);
     leftMixSlider->setBounds (183, 40, 60, 60);
-    enableToggle->setBounds (235, -3, 24, 24);
-    leftSyncToggle->setBounds (72, 56, 24, 24);
-    rightSyncToggle->setBounds (72, 152, 24, 24);
     rightMixSlider->setBounds (183, 136, 60, 60);
+
+    enableToggle->setBounds (238, 0, 18, 18);
+    leftSyncToggle->setBounds (74, 61, 16, 16);
+    rightSyncToggle->setBounds (74, 157, 16, 16);
     //[UserResized] Add your own custom resize handling here..
     //[/UserResized]
 }
@@ -297,12 +362,35 @@ void PingPongComponent::buttonClicked (Button* buttonThatWasClicked)
     {
         //[UserButtonCode_leftSyncToggle] -- add your button handler code here..
         updateSliderRange(leftSyncToggle, leftDelaySlider, leftDelay);
+
+        if(paramIndices.size() == 9 &&
+           timeDivision.size() == 24 &&
+           processor.getRegisteredMidi(paramIndices[2]))
+        {
+            if(leftSyncToggle->getToggleState()){
+                processor.changeMidiRowMinMax(0, 23, akateko::MIDI_TO_INT, paramIndices[2]);
+            } else {
+                processor.changeMidiRowMinMax(0, timeDivision[23], akateko::MIDI_TO_DOUBLE, paramIndices[2]);
+            }
+        }
+
         //[/UserButtonCode_leftSyncToggle]
     }
     else if (buttonThatWasClicked == rightSyncToggle)
     {
         //[UserButtonCode_rightSyncToggle] -- add your button handler code here..
         updateSliderRange(rightSyncToggle, rightDelaySlider, rightDelay);
+
+        if(paramIndices.size() == 9 &&
+           timeDivision.size() == 24 &&
+           processor.getRegisteredMidi(paramIndices[6]))
+        {
+            if(rightSyncToggle->getToggleState()){
+                processor.changeMidiRowMinMax(0, 23, akateko::MIDI_TO_INT, paramIndices[6]);
+            } else {
+                processor.changeMidiRowMinMax(0, timeDivision[23], akateko::MIDI_TO_DOUBLE, paramIndices[6]);
+            }
+        }
         //[/UserButtonCode_rightSyncToggle]
     }
 
@@ -340,32 +428,34 @@ void PingPongComponent::initialiseTimeDivisions(){
 
 
 void PingPongComponent::calculateTimeDivision(double bpm){
-    if(bpm > 0.0){
-        double T = 60000/bpm;
+    double crotchet = 60000/bpm;
 
-        // Calculate 1/128 Note, multiply with 2
-        double tripNote = 0.03125*T*(2.0/3.0);
-        double wholeNote = 0.03125*T;
-        double dotNote = 0.03125*T*1.5;
+    // Calculate 1/128 Note, multiply with 2
+    timeDivision.clear();
 
-        timeDivision.clear();
-
-        timeDivision.push_back(tripNote);
-        timeDivision.push_back(wholeNote);
-        timeDivision.push_back(dotNote);
-
-        for(int i=3; i<division.size(); i+=3){
-            tripNote *= 2.0;
-            wholeNote *= 2.0;
-            dotNote *= 2.0;
-
-            timeDivision.push_back(tripNote);
-            timeDivision.push_back(wholeNote);
-            timeDivision.push_back(dotNote);
-        }
+    for(int i=0; i<division.size(); i++){
+        timeDivision.push_back(crotchet*delay_timing_ratios[i]);
     }
+
     updateSliderRange(leftSyncToggle, leftDelaySlider, leftDelay);
     updateSliderRange(rightSyncToggle, rightDelaySlider, rightDelay);
+}
+
+int PingPongComponent::getTimeDivisionIndex(std::vector<double> values, double time){
+    int index = 0;
+
+    while(index < values.size()){
+        double tmpValue = values[index];
+        double error = tmpValue*0.05;
+
+        if(time >= tmpValue-error &&
+           time <= tmpValue+error)
+        {
+            return index;
+        }
+        index++;
+    }
+    return 0;
 }
 
 int PingPongComponent::findClosestTimeDivision(double time){
@@ -485,19 +575,134 @@ void PingPongComponent::updateSliderValue(Button *toggle,
 }
 
 void PingPongComponent::handleCommandMessage(int commandId){
-    if(commandId == update){
-        enableToggle->postCommandMessage(ParamToggle::update);
-        leftSyncToggle->postCommandMessage(ParamToggle::update);
+    if(commandId == updateFxGUI){
+        enableToggle->postCommandMessage(ParamImageToggle::update);
+        leftSyncToggle->postCommandMessage(ParamImageToggle::update);
         leftFBSlider->postCommandMessage(ParamSlider::update);
         leftMixSlider->postCommandMessage(ParamSlider::update);
-        rightSyncToggle->postCommandMessage(ParamToggle::update);
+        rightSyncToggle->postCommandMessage(ParamImageToggle::update);
         rightFBSlider->postCommandMessage(ParamSlider::update);
         rightMixSlider->postCommandMessage(ParamSlider::update);
 
+        if(paramIndices.size() == 9){
+            if(processor.getRegisteredMidi(paramIndices[2])){
+                if(leftSyncToggle->getToggleState()){
+                    processor.changeMidiRowMinMax(0, 23, akateko::MIDI_TO_INT, paramIndices[2]);
+                } else {
+                    processor.changeMidiRowMinMax(0, timeDivision[23], akateko::MIDI_TO_DOUBLE, paramIndices[2]);
+                }
+            }
+
+            if(processor.getRegisteredMidi(paramIndices[6])){
+                if(rightSyncToggle->getToggleState()){
+                    processor.changeMidiRowMinMax(0, 23, akateko::MIDI_TO_INT, paramIndices[6]);
+                } else {
+                    processor.changeMidiRowMinMax(0, timeDivision[23], akateko::MIDI_TO_DOUBLE, paramIndices[6]);
+                }
+            }
+        }
+
         updateSliderRange(leftSyncToggle, leftDelaySlider, leftDelay);
-        updateSliderRange(rightSyncToggle, rightDelaySlider, rightDelay);
+        updateSliderRange(rightSyncToggle, rightDelaySlider, rightDelay);          
+    } else if(commandId == updateFxBPM){
+        double bpm = processor.getBeatsPerMinute();
+
+        if(bpm < 20.0){
+            bpm = 20.0;
+        }
+
+        beatsPerMinute = bpm;
+        calculateTimeDivision(beatsPerMinute);
+    }
+
+    if(paramIndices.size() == 9 &&
+       midiStrings.size() == 9 &&
+       timeDivision.size() == 24)
+    {
+        int index = -1;
+        int param = -1;
+        int handling = -1;
+        double minValue = 0.0;
+        double maxValue = 1.0;
+
+        if(commandId == requestMenuId[0]){          // Enable
+            index = menu.show();
+            param = 0;
+            handling = akateko::MIDI_TO_INT_TOGGLE;
+        } else if(commandId == requestMenuId[1]){   // Left Sync
+            index = menu.show();
+            param = 1;
+            handling = akateko::MIDI_TO_INT_TOGGLE;
+        } else if(commandId == requestMenuId[2]){   // Left Delay
+            index = menu.show();
+            param = 2;
+
+            if(leftSyncToggle->getToggleState()){
+                maxValue = 23;
+                handling = akateko::MIDI_TO_INT;
+            } else {
+                maxValue = timeDivision[23];
+                handling = akateko::MIDI_TO_DOUBLE;
+            }
+
+        } else if(commandId == requestMenuId[3]){   // Left Feedback
+            index = menu.show();
+            param = 3;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuId[4]){   // Left Mix
+            index = menu.show();
+            param = 4;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuId[5]){   // Right Sync
+            index = menu.show();
+            param = 5;
+            handling = akateko::MIDI_TO_INT_TOGGLE;
+        } else if(commandId == requestMenuId[6]){   // Right Delay
+            index = menu.show();
+            param = 6;
+
+            if(rightSyncToggle->getToggleState()){
+                maxValue = 23;
+                handling = akateko::MIDI_TO_INT;
+            } else {
+                maxValue = timeDivision[23];
+                handling = akateko::MIDI_TO_DOUBLE;
+            }
+        } else if(commandId == requestMenuId[7]){   // Right Feedback
+            index = menu.show();
+            param = 7;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuId[8]){   // Right Mix
+            index = menu.show();
+            param = 8;
+            handling = akateko::MIDI_TO_DOUBLE;
+        }
+
+        if(index == 1){
+            MidiRow tmpRow;
+
+            initMidiRow(tmpRow, param, 0, 127, minValue, maxValue, paramIndices[param], handling , midiStrings[param], 11);
+            processor.initiateMidiLearn(tmpRow);
+        } else if(index == 0xFF){
+            processor.removeMidiRow(paramIndices[param]);
+        }
     }
 }
+
+void PingPongComponent::initialiseMidiStrings(){
+    midiStrings.clear();
+
+    midiStrings.add(" PP-Delay: Enable");
+    midiStrings.add(" PP-Delay: L-Sync");
+    midiStrings.add(" PP-Delay: L-Delay");
+    midiStrings.add(" PP-Delay: L-FB");
+    midiStrings.add(" PP-Delay: L-Mix");
+    midiStrings.add(" PP-Delay: R-Sync");
+    midiStrings.add(" PP-Delay: R-Delay");
+    midiStrings.add(" PP-Delay: R-FB");
+    midiStrings.add(" PP-Delay: R-Mix");
+}
+
 //[/MiscUserCode]
 
 
@@ -554,15 +759,15 @@ BEGIN_JUCER_METADATA
           max="1" int="0" style="RotaryHorizontalDrag" textBoxPos="NoTextBox"
           textBoxEditable="0" textBoxWidth="80" textBoxHeight="20" skewFactor="1"
           needsCallback="0"/>
-  <TOGGLEBUTTON name="enableToggle" id="88f90ae5f3542048" memberName="enableToggle"
-                virtualName="" explicitFocusOrder="0" pos="235 -3 24 24" buttonText=""
-                connectedEdges="0" needsCallback="1" radioGroupId="0" state="0"/>
-  <TOGGLEBUTTON name="leftSyncToggle" id="74bc5579149da4c2" memberName="leftSyncToggle"
-                virtualName="" explicitFocusOrder="0" pos="72 56 24 24" buttonText=""
-                connectedEdges="0" needsCallback="1" radioGroupId="0" state="0"/>
-  <TOGGLEBUTTON name="rightSyncToggle" id="73efd299c17c4595" memberName="rightSyncToggle"
-                virtualName="" explicitFocusOrder="0" pos="72 152 24 24" buttonText=""
-                connectedEdges="0" needsCallback="1" radioGroupId="0" state="0"/>
+  <IMAGEBUTTON name="enableToggle" id="88f90ae5f3542048" memberName="enableToggle"
+               virtualName="" explicitFocusOrder="0" pos="235 -3 24 24" buttonText=""
+               connectedEdges="0" needsCallback="1" radioGroupId="0" state="0"/>
+  <IMAGEBUTTON name="leftSyncToggle" id="74bc5579149da4c2" memberName="leftSyncToggle"
+               virtualName="" explicitFocusOrder="0" pos="72 56 24 24" buttonText=""
+               connectedEdges="0" needsCallback="1" radioGroupId="0" state="0"/>
+  <IMAGEBUTTON name="rightSyncToggle" id="73efd299c17c4595" memberName="rightSyncToggle"
+               virtualName="" explicitFocusOrder="0" pos="72 152 24 24" buttonText=""
+               connectedEdges="0" needsCallback="1" radioGroupId="0" state="0"/>
   <SLIDER name="rightMixSlider" id="e9d5097e5796b7b7" memberName="rightMixSlider"
           virtualName="" explicitFocusOrder="0" pos="183 136 60 60" min="0"
           max="1" int="0" style="RotaryHorizontalDrag" textBoxPos="NoTextBox"

@@ -22,8 +22,11 @@
 
 #include "EnvelopeComponent.h"
 
-
 //[MiscUserDefs] You can add your own user definitions and misc code here...
+using akateko::env_timing_ratios;
+using akateko::initMidiRow;
+using akateko::MidiRow;
+using akateko::IgnoreRightClick;
 
 //addParameter(envOneLoopEnable = new
 //addParameter(envOneLoopAmount = new ));
@@ -37,6 +40,7 @@
 EnvelopeComponent::EnvelopeComponent (const String &name, AkatekoAudioProcessor &p, int env, Label &label)
     : Component::Component(name),
       processor(p),
+      beatsPerMinute(120.0),
       duration(nullptr),
       labelRef(label)
 {
@@ -62,7 +66,6 @@ EnvelopeComponent::EnvelopeComponent (const String &name, AkatekoAudioProcessor 
      *  ParamLabel : loop
      */
 
-    vector<int> paramIndices;
     StringArray paramNames;
 
     if(env == 1){
@@ -79,15 +82,22 @@ EnvelopeComponent::EnvelopeComponent (const String &name, AkatekoAudioProcessor 
 
     int nrOfParams = paramIndices.size();
 
-    if(nrOfParams == 7){
+    if(nrOfParams == 8){
+        requestMenuIds[0] = paramNames[0].hash();
+        requestMenuIds[1] = paramNames[1].hash();
+        requestMenuIds[2] = paramNames[2].hash();
+        requestMenuIds[3] = paramNames[3].hash();
+        requestMenuIds[4] = paramNames[4].hash();
+        requestMenuIds[5] = paramNames[5].hash();
+
+        //std::cout << "Envlope : " << envNumber << " Duration : " << paramIndices[2] << std::endl;
+
         addAndMakeVisible (envEnableToggle = new ParamToggle(paramNames[0], *p.getParameters().getUnchecked(paramIndices [0]), label));
-
-        addAndMakeVisible (envSyncToggle = new ParamToggle(paramNames[1], *p.getParameters().getUnchecked(paramIndices [0]), label));
-
-        addAndMakeVisible (durationSlider =new Slider(paramNames[2]));
+        addAndMakeVisible (envSyncToggle = new ParamToggle(paramNames[1], *p.getParameters().getUnchecked(paramIndices [1]), label));
+        addAndMakeVisible (durationSlider =new IgnoreRightClick<Slider>(paramNames[2]));
         duration = p.getParameters().getUnchecked(paramIndices[2]);
 
-        addAndMakeVisible (envLoopSlider = new ParamSlider(paramNames[3], *p.getParameters().getUnchecked(paramIndices[3]), label, 1, 32));
+        addAndMakeVisible (envLoopSlider = new ParamSlider(paramNames[3], *p.getParameters().getUnchecked(paramIndices[3]), label));
         addAndMakeVisible (loopDirectionComboBox = new ParamComboBox(paramNames[4], *p.getParameters().getUnchecked(paramIndices[4]), label));
         addAndMakeVisible (susDirectionComboBox = new ParamComboBox(paramNames[5], *p.getParameters().getUnchecked(paramIndices[5]), label));
         addAndMakeVisible (triggerComboBox = new ParamComboBox(paramNames[6], *p.getParameters().getUnchecked(paramIndices[6]), label));
@@ -103,27 +113,32 @@ EnvelopeComponent::EnvelopeComponent (const String &name, AkatekoAudioProcessor 
         std::cerr << "Parameters are not bound" << std::endl;
     }
 
+
+
     //[/Constructor_pre]
 
     //[UserPreSize]
     addAndMakeVisible (envelopeDrawing = new EnvelopeDrawing ("env"));
     envelopeDrawing->setName ("envelopeDrawing");
 
+    envelopeDrawing->setColour(EnvelopeDrawing::backgroundColourId, Colours::black);
+    envelopeDrawing->setColour(EnvelopeDrawing::outlineColourId, Colour(0xAA70C099));
+    envelopeDrawing->setColour(EnvelopeDrawing::fillColourId, Colour(0xBB70C099));
+    envelopeDrawing->setColour(EnvelopeDrawing::ellipseColourId, Colour(0xFF60B090));
+    envelopeDrawing->setColour(EnvelopeDrawing::highLightColourId, Colour(0x9FA0C9B0));
+    envelopeDrawing->setColour(EnvelopeDrawing::overlayGradientTwoId, Colours::transparentBlack);
+
     durationSlider->setRange (50.f, 5000.f, 0);
-    durationSlider->setSliderStyle (Slider::LinearHorizontal);
+    durationSlider->setSliderStyle (Slider::LinearBar);
     durationSlider->setTextBoxStyle (Slider::NoTextBox, false, 80, 20);
     durationSlider->addListener(this);
 
     envLoopSlider->setTooltip (TRANS("Loop amount"));
-    envLoopSlider->setRange (0, 1, 0.03225806452);
-    envLoopSlider->setSliderStyle (Slider::LinearHorizontal);
+    envLoopSlider->setRange (1, 32, 1);
+    envLoopSlider->setSliderStyle (Slider::LinearBar);
     envLoopSlider->setTextBoxStyle (Slider::NoTextBox, false, 80, 20);
+    envLoopSlider->postCommandMessage(ParamSlider::update);
     envLoopSlider->addListener(this);
-
-    addAndMakeVisible (triggerButton = new TextButton ("triggerButton"));
-    triggerButton->setTooltip (TRANS("Trigger Envelope"));
-    triggerButton->setButtonText (TRANS("t"));
-    triggerButton->addListener (this);
 
     envEnableToggle->setButtonText (String());
 
@@ -133,14 +148,8 @@ EnvelopeComponent::EnvelopeComponent (const String &name, AkatekoAudioProcessor 
     nameLabel->setFont (Font ("Good Times", 15.00f, Font::plain));
     nameLabel->setJustificationType (Justification::centredLeft);
     nameLabel->setEditable (false, false, false);
-    nameLabel->setColour (Label::textColourId, Colours::white);
-    nameLabel->setColour (TextEditor::textColourId, Colours::black);
-    nameLabel->setColour (TextEditor::backgroundColourId, Colour(0x00000000));
-
-    addAndMakeVisible (releaseButton = new TextButton ("releaseButton"));
-    releaseButton->setTooltip (TRANS("Enter Release Stage"));
-    releaseButton->setButtonText (TRANS("r"));
-    releaseButton->addListener (this);
+    nameLabel->setColour(Label::backgroundColourId, Colours::transparentBlack);
+    nameLabel->setColour (Label::textColourId, Colour(0xFF4A997A));
 
     loopDirectionComboBox->setTooltip (TRANS("Loop direction \n"));
     loopDirectionComboBox->setEditableText (false);
@@ -178,12 +187,27 @@ EnvelopeComponent::EnvelopeComponent (const String &name, AkatekoAudioProcessor 
     triggerComboBox->addSeparator();
     triggerComboBox->postCommandMessage(ParamComboBox::update);
     triggerComboBox->addListener (this);
+
+    menu.addItem(1, "learn", true, false, nullptr);
+    menu.addSeparator();
+    menu.addItem(0xFF, "clear");
+
+    initialiseMIDIStrings();
     //[/UserPreSize]
 
     setSize (515, 250);
 
 
     //[Constructor] You can add your own custom stuff here..
+    double bpm = processor.getBeatsPerMinute();
+
+    if(bpm < 20.0){
+        bpm = 20.0;
+    }
+
+    beatsPerMinute = bpm;
+    initialiseTimeDivisions();
+    calculateTimeDivision(beatsPerMinute);
     //[/Constructor]
 }
 
@@ -195,10 +219,8 @@ EnvelopeComponent::~EnvelopeComponent()
     envelopeDrawing = nullptr;
     durationSlider = nullptr;
     envLoopSlider = nullptr;
-    triggerButton = nullptr;
     envEnableToggle = nullptr;
     nameLabel = nullptr;
-    releaseButton = nullptr;
     loopDirectionComboBox = nullptr;
     susDirectionComboBox = nullptr;
     envSyncToggle = nullptr;
@@ -215,30 +237,32 @@ void EnvelopeComponent::paint (Graphics& g)
     //[UserPrePaint] Add your own custom painting code here..
     //[/UserPrePaint]
 
-    g.fillAll (Colour (0xff323232));
+    g.fillAll (Colours::black);
 
-    g.setColour (Colour (0xffaaaaaa));
+    g.setColour (Colour (0xFF4A997A));
     g.setFont (Font ("Good Times", 11.00f, Font::plain));
     g.drawText (TRANS("duration"),
-                426, 30, 75, 14,
+                423, 30, 73, 10,
                 Justification::centred, true);
 
-    g.setColour (Colour (0xffaaaaaa));
     g.setFont (Font ("Good Times", 11.00f, Font::plain));
-    g.drawText (TRANS("loop"),
-                440, 79, 46, 12,
+    g.drawText (TRANS("loop nr"),
+                420, 74, 80, 12,
                 Justification::centred, true);
 
-    g.setColour (Colour (0xffaaaaaa));
+    g.drawText (TRANS("loop dir"),
+                420, 119, 80, 12,
+                Justification::centred, true);
+
+
     g.setFont (Font ("Good Times", 11.00f, Font::plain));
-    g.drawText (TRANS("sustain"),
-                432, 153, 67, 9,
+    g.drawText (TRANS("sustain dir"),
+                420, 165, 80, 9,
                 Justification::centred, true);
 
-    g.setColour (Colour (0xffaaaaaa));
     g.setFont (Font ("Good Times", 11.00f, Font::plain));
     g.drawText (TRANS("trigger"),
-                425, 200, 75, 14,
+                424, 209, 75, 14,
                 Justification::centred, true);
 
     //[UserPaint] Add your own custom painting code here..
@@ -249,18 +273,18 @@ void EnvelopeComponent::resized()
 {
     //[UserPreResize] Add your own custom resize code here..
     //[/UserPreResize]
-
     envelopeDrawing->setBounds (5, 5, 400, 240);
-    durationSlider->setBounds (408, 48, 104, 20);
-    envLoopSlider->setBounds (408, 96, 104, 17);
-    triggerButton->setBounds (416, 200, 12, 12);
-    envEnableToggle->setBounds (494, 0, 24, 24);
-    nameLabel->setBounds (428, 1, 66, 24);
-    releaseButton->setBounds (496, 200, 12, 12);
-    loopDirectionComboBox->setBounds (412, 120, 96, 20);
-    susDirectionComboBox->setBounds (412, 168, 96, 20);
-    envSyncToggle->setBounds (408, 24, 24, 24);
-    triggerComboBox->setBounds (412, 216, 96, 20);
+
+    envEnableToggle->setBounds (492, 1, 24, 24);
+    nameLabel->setBounds (429, 2, 66, 24);
+
+    envSyncToggle->setBounds (493, 24, 20, 20);
+    durationSlider->setBounds (412, 46, 96, 16);
+    envLoopSlider->setBounds (412, 91, 96, 16);
+
+    loopDirectionComboBox->setBounds (412, 136, 96, 16);
+    susDirectionComboBox->setBounds (412, 181, 96, 16);
+    triggerComboBox->setBounds (412, 226, 96, 16);
     //[UserResized] Add your own custom resize handling here..
     //[/UserResized]
 }
@@ -297,10 +321,8 @@ void EnvelopeComponent::sliderValueChanged(Slider* sliderThatWasMoved)
                 } else if(envNumber == 2){
 
                 }
-
                 tmpName += String(tmpVal);
             }
-
             labelRef.setText(tmpName, dontSendNotification);
         }
         //[/UserSliderCode_durationSlider]
@@ -314,8 +336,6 @@ void EnvelopeComponent::sliderValueChanged(Slider* sliderThatWasMoved)
             processor.updateEnvelopeTwoLoopAmount();
         }
     }
-
-
     //[/UsersliderValueChanged_Post]
 }
 
@@ -324,32 +344,14 @@ void EnvelopeComponent::buttonClicked (Button* buttonThatWasClicked)
     //[UserbuttonClicked_Pre]
     //[/UserbuttonClicked_Pre]
 
-    if (buttonThatWasClicked == triggerButton)
-    {
-        //[UserButtonCode_triggerButton] -- add your button handler code here..
-        if(envNumber == 1){
-            processor.triggerEnvelopeOne();
-        } else if(envNumber == 2){
-            processor.triggerEnvelopeTwo();
-        }
-        //[/UserButtonCode_triggerButton]
-    }
-    else if (buttonThatWasClicked == releaseButton)
-    {
-        //[UserButtonCode_releaseButton] -- add your button handler code here..
-        if(envNumber == 1){
-            processor.releaseEnvelopeOne();
-        } else if(envNumber == 2){
-            processor.releaseEnvelopeTwo();
-        }
-        //[/UserButtonCode_releaseButton]
-    }
-    else if (buttonThatWasClicked == envSyncToggle)
+    if (buttonThatWasClicked == envSyncToggle)
     {
         //[UserButtonCode_envSyncToggle] -- add your button handler code here..
         double tmpDur = 0.0;
 
-        if(duration != nullptr){
+        if(duration != nullptr &&
+           !paramIndices.empty())
+        {
             tmpDur = duration->getValue();
 
             const bool tmpSync = envSyncToggle->getToggleState();
@@ -360,9 +362,15 @@ void EnvelopeComponent::buttonClicked (Button* buttonThatWasClicked)
 
                 durationSlider->setRange(0, valueBeatDivision.size()-1);
                 durationSlider->setValue(tmpIndex, sendNotification);
+
+
                 duration->setValue(valueBeatDivision[tmpIndex]);
 
                 int last = valueBeatDivision.size()-1;
+
+                if(processor.getRegisteredMidi(paramIndices[2])){
+                    processor.changeMidiRowMinMax(0, 23, akateko::MIDI_TO_INT, paramIndices[2]);
+                }
 
                 if(envNumber == 1){
                     processor.setEnvelopeOneDurationBounds(valueBeatDivision[0],
@@ -378,6 +386,10 @@ void EnvelopeComponent::buttonClicked (Button* buttonThatWasClicked)
 
                 if(tmpDur <= 50.f){
                     tmpDur = 50.f;
+                }
+
+                if(processor.getRegisteredMidi(paramIndices[2])){
+                    processor.changeMidiRowMinMax(50.0, 5000.0, akateko::MIDI_TO_DOUBLE, paramIndices[2]);
                 }
 
                 durationSlider->setRange(50.f, 5000.f);
@@ -431,7 +443,40 @@ void EnvelopeComponent::comboBoxChanged (ComboBox* comboBoxThatHasChanged)
     else if (comboBoxThatHasChanged == triggerComboBox)
     {
         //[UserComboBoxCode_triggerComboBox] -- add your combo box handling code here..
-        std::cout << "Trigger Combobox triggered : change setting" << std::endl;
+        // Implement
+        int index = triggerComboBox->getSelectedItemIndex();
+
+        if(index == 0){
+            StringArray &tmpArray = envOneMIDI;
+            int section = 5;
+
+            if(envNumber == 2){
+                tmpArray = envTwoMIDI;
+                section = 6;
+            }
+
+            if(tmpArray.size() == 7 &&
+               paramIndices.size() == 8)
+            {
+                // Add MidiNote will be reset
+
+                MidiRow tmpRow;
+
+                initMidiRow(tmpRow, 6, 0, 127, 0, 1, paramIndices[7], akateko::MIDI_TO_INT_TOGGLE, tmpArray[6], section);
+                tmpRow.initialised = true;
+                tmpRow.midiMessage = akateko::MIDI_NOTE;
+                tmpRow.firstByte = 60;
+                tmpRow.channel = 1;
+
+
+                // Doest not overwrite if the row already
+                // existsIn the Midi Table
+                processor.setMidiTriggerRow(tmpRow);
+            }
+        } else if(index == 1 && paramIndices.size() == 8){
+            processor.removeMidiRow(paramIndices[7]);
+        }
+
         //[/UserComboBoxCode_triggerComboBox]
     }
 
@@ -442,20 +487,6 @@ void EnvelopeComponent::comboBoxChanged (ComboBox* comboBoxThatHasChanged)
 
 
 //[MiscUserCode] You can add your own definitions of your custom methods or any other code here...
-
-void EnvelopeComponent::handleCommandMessage(int commandId){
-    switch(commandId){
-        case EnvelopeDrawing::envelopeUpdated:
-            updateEnvelope(envNumber);
-            break;
-        case EnvelopeDrawing::loopPointsUpdated:
-            updateLoop(envNumber);
-            break;
-        case EnvelopeDrawing::sustainPointsUpdated:
-            updateSustain(envNumber);
-            break;
-    }
-}
 
 void EnvelopeComponent::updateEnvelope(int env){
     float startPos = 0.f;
@@ -573,11 +604,12 @@ String EnvelopeComponent::getUIState(){
     return envelopeDrawing->toString();
 }
 
+/*
 void EnvelopeComponent::setBeatDivisionStrings(StringArray beatDivStr){
     int steps = beatDivStr.size()-1;
     beatDivision.clear();
 
-    /* Reverse Copy */
+
     while(steps >= 0){
         beatDivision.add(beatDivStr[steps]);
         steps--;
@@ -593,7 +625,7 @@ void EnvelopeComponent::setBeatDivisionValues(vector<double> beatDivVal){
         steps--;
     }
 }
-
+*/
 void EnvelopeComponent::initDurationSlider(){
     if(duration != nullptr &&
        envSyncToggle != nullptr &&
@@ -672,15 +704,194 @@ int EnvelopeComponent::findClosestTimeDivision(double period){
 void EnvelopeComponent::updateGui(){
     envEnableToggle->postCommandMessage(ParamToggle::update);
     envSyncToggle->postCommandMessage(ParamToggle::update);
-
     envLoopSlider->postCommandMessage(ParamSlider::update);
     loopDirectionComboBox->postCommandMessage(ParamComboBox::update);
     susDirectionComboBox->postCommandMessage(ParamComboBox::update);
     triggerComboBox->postCommandMessage(ParamComboBox::update);
 
-    initDurationSlider();
+    double bpm = processor.getBeatsPerMinute();
+
+    if(paramIndices.size() == 8){
+        if(envSyncToggle->getToggleState()){
+            if(processor.getRegisteredMidi(paramIndices[2])){
+                processor.changeMidiRowMinMax(0, 23, akateko::MIDI_TO_INT, paramIndices[2]);
+            }
+        } else {
+            if(processor.getRegisteredMidi(paramIndices[2])){
+                processor.changeMidiRowMinMax(50.0, 5000.0, akateko::MIDI_TO_DOUBLE, paramIndices[2]);
+            }
+        }
+    }
+
+    if(bpm < 20.0){
+        bpm = 20.0;
+    }
+
+    beatsPerMinute = bpm;
+    initialiseTimeDivisions();
+    calculateTimeDivision(beatsPerMinute);
+
     updateEnvelope(envNumber);
 }
+
+void EnvelopeComponent::setLookAndFeel(LookAndFeel *laf){
+    envEnableToggle->setLookAndFeel(laf);
+    durationSlider->setLookAndFeel(laf);
+    envLoopSlider->setLookAndFeel(laf);
+    loopDirectionComboBox->setLookAndFeel(laf);
+    susDirectionComboBox->setLookAndFeel(laf);
+    envSyncToggle->setLookAndFeel(laf);
+    triggerComboBox->setLookAndFeel(laf);
+    envelopeDrawing->setLookAndFeel(laf);
+    menu.setLookAndFeel(laf);
+}
+
+void EnvelopeComponent::initialiseMIDIStrings(){
+    // Env One
+    envOneMIDI.clear();
+
+    envOneMIDI.add(" Env One: Enable");
+    envOneMIDI.add(" Env One: Sync");
+    envOneMIDI.add(" Env One: Dur");
+    envOneMIDI.add(" Env One: Loop Nr");
+    envOneMIDI.add(" Env One: Loop Dir");
+    envOneMIDI.add(" Env One: Sus Dir");
+    envOneMIDI.add(" Env One: Trigger");
+
+    // Env Two
+    envTwoMIDI.clear();
+
+    envTwoMIDI.add(" Env Two: Enable");
+    envTwoMIDI.add(" Env Two: Sync");
+    envTwoMIDI.add(" Env Two: Dur");
+    envTwoMIDI.add(" Env Two: Loop Nr");
+    envTwoMIDI.add(" Env Two: Loop Dir");
+    envTwoMIDI.add(" Env Two: Sus Dir");
+    envTwoMIDI.add(" Env Two: Trigger");
+}
+
+void EnvelopeComponent::handleCommandMessage(int commandId){
+    switch(commandId){
+        case EnvelopeDrawing::envelopeUpdated:
+            updateEnvelope(envNumber);
+            break;
+        case EnvelopeDrawing::loopPointsUpdated:
+            updateLoop(envNumber);
+            break;
+        case EnvelopeDrawing::sustainPointsUpdated:
+            updateSustain(envNumber);
+            break;
+    }
+
+    if(paramIndices.size() == 8 &&
+       envOneMIDI.size() == 7 &&
+       envTwoMIDI.size() == 7)
+    {
+        int index = -1;
+        int param = -1;
+        int handling = -1;
+        double minValue = 0.0;
+        double maxValue = 1.0;
+
+        if(commandId == requestMenuIds[0]){         // Enable
+            index = menu.show();
+            param = 0;
+            handling = akateko::MIDI_TO_INT_TOGGLE;
+        } else if(commandId == requestMenuIds[1]){  // Sync
+            index = menu.show();
+            param = 1;
+            handling = akateko::MIDI_TO_INT_TOGGLE;
+        } else if(commandId == requestMenuIds[2]){  // Duration           
+            index = menu.show();
+
+            param = 2;
+
+            if(envSyncToggle->getToggleState()){
+                maxValue = 23;
+                handling = akateko::MIDI_TO_INT;
+            } else {
+                minValue = 50.;
+                maxValue = 5000.;
+                handling = akateko::MIDI_TO_DOUBLE;
+            }
+        } else if(commandId == requestMenuIds[3]){  // Loop Number
+            index = menu.show();
+            param = 3;
+            minValue = 1;
+            maxValue = 32;
+            handling = akateko::MIDI_TO_INT;
+        } else if(commandId == requestMenuIds[4]){  // Loop Direction
+            index = menu.show();
+            param = 4;
+            maxValue = 2;
+            handling = akateko::MIDI_TO_INT;
+        } else if(commandId == requestMenuIds[5]){  // Sustain Direction
+            index = menu.show();
+            param = 5;
+            maxValue = 2;
+            handling = akateko::MIDI_TO_INT;
+        }
+
+        StringArray &tmpArray = envOneMIDI;
+        int section = 5;
+
+        if(envNumber == 2){
+            tmpArray = envTwoMIDI;
+            section = 6;
+        }
+
+        if(index == 1){
+            MidiRow tmpRow;
+
+            initMidiRow(tmpRow, param, 0, 127, minValue, maxValue, paramIndices[param], handling, tmpArray[param], section); // Enable
+            processor.initiateMidiLearn(tmpRow);
+        } else if(index == 0xFF){
+            processor.removeMidiRow(paramIndices[param]);
+
+            String message = tmpArray[param] + String(" cleared");
+            labelRef.setText(message, sendNotificationAsync);
+        }
+    }
+}
+
+void EnvelopeComponent::calculateTimeDivision(double bpm){
+    if(bpm > 0.0){
+        double crotchet = 60000.0/bpm;
+
+        // Calculate 1/128 Note, multiply with 2
+        valueBeatDivision.clear();
+
+        for(int i=0; i<beatDivision.size(); i++){
+            valueBeatDivision.push_back(crotchet*env_timing_ratios[i]);
+        }
+    }
+    initDurationSlider();
+}
+
+void EnvelopeComponent::initialiseTimeDivisions(){
+    StringArray noteVals;
+    beatDivision.clear();
+
+    noteVals.add("1/16N");
+    noteVals.add("1/8N");
+    noteVals.add("1/4N");
+    noteVals.add("1/2N");
+    noteVals.add("1N");
+    noteVals.add("2N");
+    noteVals.add("3N");
+    noteVals.add("4N");
+
+    for(int i=0; i<noteVals.size(); i++){
+        String triplet = noteVals[i] + String("T");
+        String dot = noteVals[i] + String("D");
+
+        beatDivision.add(triplet);
+        beatDivision.add(noteVals[i]);
+        beatDivision.add(dot);
+    }
+}
+
+
 //[/MiscUserCode]
 
 

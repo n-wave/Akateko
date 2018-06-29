@@ -35,6 +35,7 @@ AkatekoAudioProcessorEditor::AkatekoAudioProcessorEditor (AkatekoAudioProcessor&
     : AudioProcessorEditor (&p), processor (p)
 {
     //[Constructor_pre] You can add your own custom stuff here..
+    modInitialized = false;
     buttonColour = Colour(0x73707070);
     activeColour = Colour(0x7f007f7f);
 
@@ -44,47 +45,32 @@ AkatekoAudioProcessorEditor::AkatekoAudioProcessorEditor (AkatekoAudioProcessor&
     addAndMakeVisible(filter = new FilterComponent("Filter", processor, paramLabel));
     addAndMakeVisible(waveShaper = new WaveShapeComponent("WaveShape", processor, paramLabel));
 
-    addAndMakeVisible (xyPad = new XYPad(paramLabel,
-                                         processor.getModMatrix().getWriteRegister(MODSRC::PADX),
-                                         processor.getModMatrix().getWriteRegister(MODSRC::PADY)));
+    /* Prepare XYPAD */
+    addAndMakeVisible (xyPad = new XYPad(processor,
+                                         paramLabel));
+
 
     String tmpXYPad = String("XYPAD");
     xyPadCommandId = tmpXYPad.hashCode(); //Create Identifier
     xyPad->setName(tmpXYPad);
     xyPad->setUpdateCommandId(xyPadCommandId);
+    xyPad->setColour(XYPad::outlineColourId, Colour(0xAA407050));
+    xyPad->setColour(XYPad::overlayGradientTwoId, Colour(0x3F00FFDA));
+    xyPad->setColour(XYPad::fillColourId, Colour(0xFF60B090));
 
-    this->initialiseDisplayLabel();
-    this->initialiseEffectContainer();
-    this->initialiseModulationContainer();
+    initialiseDisplayLabel();
+    initialiseEffectContainer();
+    initialiseModulationContainer();
+    initialiseToolBarSection();
+
+    addChildComponent(backPanel = new BackPanel(p), -1);
+
 
     //[/Constructor_pre]
     //[UserPreSize]
-
     // Preset Buttons
-    addAndMakeVisible (loadPresetButton = new TextButton ("savePresetButton"));
-    loadPresetButton->setButtonText (TRANS("load"));
-    loadPresetButton->addListener (this);
-    loadPresetButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    loadPresetButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    loadPresetButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
-
-    addAndMakeVisible (savePresetButton = new TextButton ("new button"));
-    savePresetButton->setButtonText (TRANS("save"));
-    savePresetButton->addListener (this);
-    savePresetButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    savePresetButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    savePresetButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
     // Main Volume Sliders
-    addAndMakeVisible (InputVolumeSlider = new Slider ("Input"));
-    InputVolumeSlider->setRange (0.01, 2, 0);
-    InputVolumeSlider->setSliderStyle (Slider::RotaryVerticalDrag);
-    InputVolumeSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
-
-    addAndMakeVisible (mainVolumeSlider = new Slider ("mainVolume"));
-    mainVolumeSlider->setRange (-1, 1, 0.001);
-    mainVolumeSlider->setSliderStyle (Slider::RotaryVerticalDrag);
-    mainVolumeSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
 
     //[/UserPreSize]
 
@@ -93,15 +79,47 @@ AkatekoAudioProcessorEditor::AkatekoAudioProcessorEditor (AkatekoAudioProcessor&
 
     //[Constructor] You can add your own custom stuff here..
 
-    //Restore XY Pad Values
-    if(processor.shapesInitialised()){
-        xyPad->restoreFromString(processor.getUIState(AkatekoAudioProcessor::xyPadId));
-    }
+    //Set Look and Feel Methods for the child components
+    claf = new CustomLookAndFeel();
+    r1laf = new SliderLookAndFeelBottomV1();
+    r2laf = new SliderLookAndFeelBottomV2();
+
+    slaf = new SliderLookAndFeel(ImageCache::getFromMemory(BinaryData::AkatekoSmallV2_png, BinaryData::AkatekoSmallV2_pngSize));
+    blaf = new SliderLookAndFeel(ImageCache::getFromMemory(BinaryData::AkatekoBigV3_png, BinaryData::AkatekoBigV3_pngSize));
+
+    waveShaper->setLookAndFeel(claf, blaf);
+    filter->setLookAndFeel(claf, blaf, slaf);
+
+    lfoOne->setLookAndFeel(claf, r1laf, r2laf);
+    lfoTwo->setLookAndFeel(claf, r1laf, r2laf);
+    envOne->setLookAndFeel(claf);
+    envTwo->setLookAndFeel(claf);
+    stepSeq->setLookAndFeel(claf);
+    preset->setLookAndFeel(claf);
+    backPanel->setLookAndFeel(claf, r1laf);
+    xyPad->setLookAndFeel(claf);
+
+    //Main Volume Sliders
+    InputVolumeSlider->setLookAndFeel(slaf);
+    mainVolumeSlider->setLookAndFeel(slaf);
 
     // Set Labels
     presetLabel.setText("Akateko", sendNotificationSync);
     paramLabel.setText("Ready", sendNotificationSync);
+    bpmLabel.setText(String(currentBPM, 2), sendNotificationAsync);
 
+    // Set background Image
+    backGroundImage = ImageCache::getFromMemory(BinaryData::AkatekoMetal_png, BinaryData::AkatekoMetal_pngSize);
+
+
+    // Timer functionality
+    startTimer(50); //Time in Milliseconds
+    midiLearnFlash = 0;
+
+    //Popup Menu
+    menu.addItem(1, "learn");
+    menu.addSeparator();
+    menu.addItem(0xFF, "clear");
     //[/Constructor]
 }
 
@@ -129,7 +147,6 @@ AkatekoAudioProcessorEditor::~AkatekoAudioProcessorEditor()
     mainVolumeSlider = nullptr;
     presetButton = nullptr;
 
-
     //[Destructor]. You can add your own custom destruction code here..
     lfoOne = nullptr;
     lfoTwo = nullptr;
@@ -137,9 +154,14 @@ AkatekoAudioProcessorEditor::~AkatekoAudioProcessorEditor()
     envTwo = nullptr;
     stepSeq = nullptr;
     modMatrix = nullptr;
-    //[/UserVariables]
+    slaf = nullptr;
+    claf = nullptr;
+    r1laf = nullptr;
+    r2laf = nullptr;
 
-
+    inputVolume = nullptr;
+    outputVolume = nullptr;
+    backPanel = nullptr;
     //[/Destructor]
 }
 
@@ -147,59 +169,29 @@ AkatekoAudioProcessorEditor::~AkatekoAudioProcessorEditor()
 void AkatekoAudioProcessorEditor::paint (Graphics& g)
 {
     //[UserPrePaint] Add your own custom painting code here..
+
+    // Set Button state thus changing the necessary image accordingly
+
+    switch(activeModulation){
+        case LFO1: setButtonState(lfoOneButton); break;
+        case LFO2: setButtonState(lfoTwoButton); break;
+        case ENV1: setButtonState(envOneButton); break;
+        case ENV2: setButtonState(envTwoButton); break;
+        case SSEQ: setButtonState(stepButton); break;
+        case MODM: setButtonState(modulationButton); break;
+        case PRST: setButtonState(presetButton); break;
+    }
+
+
+    g.setTiledImageFill(backGroundImage, getWidth(), getHeight(), 1.0);
+    g.fillRect(0, 0, getWidth(), getHeight());
     //[/UserPrePaint]
-
-    g.setColour (Colours::black);
-    g.fillRoundedRectangle (0.0f, 0.0f, 895.0f, 600.0f, 4.000f);
-
-    g.setColour (Colour (0xff323232));
-    g.fillRoundedRectangle (5.0f, 5.0f, 885.0f, 50.0f, 4.000f);
-
-    g.setColour (Colour (0xff4e4e4e));
-    g.fillRoundedRectangle (5.0f, 330.0f, 885.0f, 265.0f, 4.000f);
-
-    g.setColour (Colour (0xff4e4e4e));
-    g.fillRoundedRectangle (5.0f, 60.0f, 885.0f, 265.0f, 4.000f);
-
-    g.setColour (Colour (0xff323232));
-    g.fillRoundedRectangle (10.0f, 65.0f, 345.0f, 255.0f, 2.000f);
-
-    g.setColour (Colours::black);
-    g.drawRoundedRectangle (10.0f, 65.0f, 345.0f, 255.0f, 2.000f, 2.000f);
-
-    g.setColour (Colour (0xff323232));
-    g.fillRoundedRectangle (365.0f, 65.0f, 255.0f, 255.0f, 2.000f);
-
-    g.setColour (Colours::black);
-    g.drawRoundedRectangle (365.0f, 65.0f, 255.0f, 255.0f, 2.000f, 2.000f);
-
-    g.setColour (Colour (0xff323232));
-    g.fillRoundedRectangle (630.0f, 65.0f, 255.0f, 255.0f, 2.000f);
-
-    g.setColour (Colours::black);
-    g.drawRoundedRectangle (630.0f, 65.0f, 255.0f, 255.0f, 2.000f, 2.000f);
-
-    g.setColour (Colour (0xff323232));
-    g.fillRoundedRectangle (10.0f, 335.0f, 610.0f, 255.0f, 2.000f);
-
-    g.setColour (Colours::black);
-    g.drawRoundedRectangle (10.0f, 335.0f, 610.0f, 255.0f, 2.000f, 2.000f);
-
-    g.setColour (Colour (0xff323232));
-    g.fillRoundedRectangle (630.0f, 335.0f, 255.0f, 255.0f, 2.000f);
-
-    g.setColour (Colours::black);
-    g.drawRoundedRectangle (630.0f, 335.0f, 255.0f, 255.0f, 2.000f, 2.000f);
 
     g.setGradientFill (ColourGradient (Colour (0xff6f6d6d),
                                        88.0f, 16.0f,
                                        Colours::white,
                                        88.0f, 64.0f,
                                        false));
-    g.setFont (Font ("Good Times", 46.00f, Font::plain));
-    g.drawText (TRANS("AKATEKO"),
-                50, 16, 258, 33,
-                Justification::centred, true);
 
     g.setColour (Colour (0xffaaaaaa));
     g.setFont (Font ("Good Times", 16.00f, Font::plain));
@@ -208,35 +200,51 @@ void AkatekoAudioProcessorEditor::paint (Graphics& g)
                 Justification::centred, true);
 
     //[UserPaint] Add your own custom painting code here..
+
+    g.setColour(Colours::black);
+    g.fillRoundedRectangle(726, 14, 105, 32, 2.f);
+
+    g.setColour(Colour (0xFF001D1D));
+    g.fillRect(731, 18, 95, 24);
+
+    g.setColour(Colour(0xFF4A997A));
+    g.setFont (Font ("Arial Black", 16.00f, Font::plain));
+    g.drawText("BPM", 769, 21, 75, 24,
+                Justification::centred, true);
+
     //[/UserPaint]
 }
 
 void AkatekoAudioProcessorEditor::resized()
 {
     //[UserPreResize] Add your own custom resize code here..
-    //waveShaper->setBounds (365, 65, 255, 255);
-    //[/UserPreResize]
+    lfoOneButton->setBounds (24, 351, 66, 31);
+    lfoTwoButton->setBounds (24, 383, 66, 31);
+    envOneButton->setBounds (24, 415, 66, 31);
+    envTwoButton->setBounds (24, 447, 66, 31);
 
-    lfoOneButton->setBounds (24, 352, 70, 30);
-    lfoTwoButton->setBounds (24, 384, 70, 30);
-    envOneButton->setBounds (24, 416, 70, 30);
-    envTwoButton->setBounds (24, 448, 70, 30);
-    stepButton->setBounds (24, 480, 70, 30);
-    modulationButton->setBounds (24, 512, 70, 30);
-    loadPresetButton->setBounds (320, 8, 32, 20);
-    savePresetButton->setBounds (320, 32, 32, 20);
-    InputVolumeSlider->setBounds (10, 11, 40, 40);
+    stepButton->setBounds (24, 479, 66, 31);
+    modulationButton->setBounds (24, 511, 66, 31);
+    presetButton->setBounds (24, 543, 66, 31);
+
+    loadPresetButton->setBounds (320, 9, 31, 19);
+    savePresetButton->setBounds (320, 30, 31, 19);
+
     waveShaper->setBounds (365, 65, 255, 255);
     filter->setBounds (10, 65, 345, 255);
     xyPad->setBounds (635, 340, 246, 246);
     modMatrix->setBounds (108, 343, 505, 240);
     fxContainer->setBounds (630, 65, 255, 255);
-    mainVolumeSlider->setBounds (844, 11, 40, 40);
-    presetButton->setBounds (24, 544, 70, 30);
-    //[UserResized] Add your own custom resize handling here..
 
-    presetLabel.setBounds (368, 9, 248, 18);
-    paramLabel.setBounds (368, 33, 248, 18);
+    InputVolumeSlider->setBounds (7, 10, 42, 42);
+    mainVolumeSlider->setBounds (844, 10, 42, 42);
+    //[/UserPreResize]
+
+
+    //[UserResized] Add your own custom resize handling here..
+    presetLabel.setBounds (366, 9, 252, 19);
+    paramLabel.setBounds (366, 30, 252, 19);
+    bpmLabel.setBounds(730, 18, 60, 24);
 
     modMatrix->initialiseHeader(505, 240);
     lfoOne->setBounds(102, 338, 515, 250);
@@ -249,6 +257,18 @@ void AkatekoAudioProcessorEditor::resized()
     /* Set Image after resize for proper, gradient positioning */
     const Image tmpBackGround = ImageCache::getFromMemory(BinaryData::hexagonpattern_png, BinaryData::hexagonpattern_pngSize);
     xyPad->setBackgroundImage(tmpBackGround, true);
+
+
+    // 102, 338, 515, 250
+    overlay = ColourGradient(Colours::transparentBlack,
+                             359.5,
+                             463,
+                             Colour(0x2000DFBA),
+                             525,
+                             525,
+                             true);
+
+    backPanel->setBounds(0, 0, 895, 600);
     //[/UserResized]
 }
 
@@ -263,7 +283,7 @@ void AkatekoAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
 
         hideModulationComponent(activeModulation); //hide previous modulation component
         activeModulation = LFO1;
-        lfoOneButton->setColour(TextButton::buttonColourId, activeColour);
+        lfoOneButton->setState(ImageButton::buttonOver);
         lfoOne->setVisible(true);
         this->repaint();
         //[/UserButtonCode_lfoOneButton]
@@ -274,7 +294,7 @@ void AkatekoAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
 
         hideModulationComponent(activeModulation); //hide previous modulation component
         activeModulation = LFO2;
-        lfoTwoButton->setColour(TextButton::buttonColourId, activeColour);
+        lfoTwoButton->setState(ImageButton::buttonOver);
         lfoTwo->setVisible(true);
         this->repaint();
         //[/UserButtonCode_lfoTwoButton]
@@ -285,7 +305,7 @@ void AkatekoAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
 
         hideModulationComponent(activeModulation); //hide previous modulation component
         activeModulation = ENV1;
-        envOneButton->setColour(TextButton::buttonColourId, activeColour);
+        envOneButton->setState(ImageButton::buttonOver);
         envOne->setVisible(true);
         this->repaint();
         //[/UserButtonCode_envOneButton]
@@ -295,7 +315,7 @@ void AkatekoAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
         //[UserButtonCode_envTwoButton] -- add your button handler code here..
         hideModulationComponent(activeModulation); //hide previous modulation component
         activeModulation = ENV2;
-        envTwoButton->setColour(TextButton::buttonColourId, activeColour);
+        envTwoButton->setState(ImageButton::buttonOver);
         envTwo->setVisible(true);
         this->repaint();
         //[/UserButtonCode_envTwoButton]
@@ -305,7 +325,7 @@ void AkatekoAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
         //[UserButtonCode_stepButton] -- add your button handler code here..
         hideModulationComponent(activeModulation); //hide previous modulation component
         activeModulation = SSEQ;
-        stepButton->setColour(TextButton::buttonColourId, activeColour);
+        stepButton->setState(ImageButton::buttonOver);
         stepSeq->setVisible(true);
         this->repaint();
         //[/UserButtonCode_stepButton]
@@ -315,7 +335,7 @@ void AkatekoAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
         //[UserButtonCode_modulationButton] -- add your button handler code here..
         hideModulationComponent(activeModulation); //hide previous modulation component
         activeModulation = MODM;
-        modulationButton->setColour(TextButton::buttonColourId, activeColour);
+        modulationButton->setState(ImageButton::buttonOver);
         modMatrix->setVisible(true);
         this->repaint();
         //[/UserButtonCode_modulationButton]
@@ -325,7 +345,7 @@ void AkatekoAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
         //[UserButtonCode_presetButton] -- add your button handler code here..
         hideModulationComponent(activeModulation);
         activeModulation = PRST;
-        presetButton->setColour(TextButton::buttonColourId, activeColour);
+        presetButton->setState(ImageButton::buttonOver);
         preset->setVisible(true);
         this->repaint();
         //[/UserButtonCode_presetButton]
@@ -354,8 +374,6 @@ void AkatekoAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
         processor.save();
         //[/UserButtonCode_savePresetButton]
     }
-
-
     //[UserbuttonClicked_Post]
     //[/UserbuttonClicked_Post]
 }
@@ -380,10 +398,49 @@ void AkatekoAudioProcessorEditor::handleCommandMessage (int commandId)
         processor.setUIState(xyPad->toString(), AkatekoAudioProcessor::xyPadId);
     } else if(commandId == presetCommandId){
         updateGui();
-
         const String tmpPresetName = processor.getCurrentPresetName();
         presetLabel.setText(tmpPresetName, sendNotificationSync);
+    } else if(commandId == updateTimeId){
+        double bpm = processor.getBeatsPerMinute();
+
+        if(modInitialized && bpm >= 20.0 && bpm != currentBPM ){
+            currentBPM = bpm;
+
+            stepSeq->calculateBeatDivision(currentBPM); //Update Beats Per Minute
+
+            lfoOne->calculateTimeDivision(currentBPM);
+            lfoTwo->calculateTimeDivision(currentBPM);
+
+            envOne->calculateTimeDivision(currentBPM);
+            envTwo->calculateTimeDivision(currentBPM);
+
+            fxContainer->updateBeatsPerMinute();
+            bpmLabel.setText(String(currentBPM, 2), sendNotificationAsync);
+
+        }
+    } else if(paramIndices.size() == 2 &&
+              midiStrings.size() == 2)
+    {
+        int index = -1;
+        int param = -1;
+
+        if(commandId == requestMenuId[0]){
+            index = menu.show();
+            param = 0;
+        } else if(commandId == requestMenuId[1]){
+            index = menu.show();
+            param = 1;
+        }
+
+        if(index == 1){
+            MidiRow tmpRow;
+            initMidiRow(tmpRow, param, 0, 127, 0.0, 2.0, paramIndices[param], akateko::MIDI_TO_DOUBLE, midiStrings[param], 0);
+            processor.initiateMidiLearn(tmpRow);
+        } else if(index == 0xFF){
+            processor.removeMidiRow(paramIndices[param]);
+        }
     }
+
     //[/UserCode_handleCommandMessage]
 }
 
@@ -394,19 +451,24 @@ void AkatekoAudioProcessorEditor::initialiseDisplayLabel(){
     presetLabel.setFont (Font (15.00f, Font::plain));
     presetLabel.setJustificationType (Justification::centredLeft);
     presetLabel.setEditable (false, false, false);
-    presetLabel.setColour (Label::backgroundColourId, Colour (0x7f2d0000));
-    presetLabel.setColour (Label::textColourId, Colour (0xffdfdfdf));
-    presetLabel.setColour (TextEditor::textColourId, Colours::black);
-    presetLabel.setColour (TextEditor::backgroundColourId, Colour (0x00000000));
+    presetLabel.setColour (Label::backgroundColourId, Colour(0xEF002020));
+    presetLabel.setColour (Label::textColourId,  Colour(0xFF4A997A));
 
     addAndMakeVisible (&paramLabel);
     paramLabel.setFont (Font (15.00f, Font::plain));
     paramLabel.setJustificationType (Justification::centredLeft);
     paramLabel.setEditable (false, false, false);
-    paramLabel.setColour (Label::backgroundColourId, Colour (0x7f2d0000));
-    paramLabel.setColour (Label::textColourId, Colour (0xffdfdfdf));
+    paramLabel.setColour (Label::backgroundColourId, Colour (0xEF002020));
+    paramLabel.setColour (Label::textColourId, Colour(0xFF4A997A));
     paramLabel.setColour (TextEditor::textColourId, Colours::black);
-    paramLabel.setColour (TextEditor::backgroundColourId, Colour (0x00000000));
+
+    addAndMakeVisible(&bpmLabel);
+    bpmLabel.setFont (Font (22.00f, Font::bold));
+    bpmLabel.setJustificationType (Justification::centredRight);
+    bpmLabel.setEditable (false, false, false);
+    bpmLabel.setColour (Label::backgroundColourId, Colours::transparentBlack);
+    bpmLabel.setColour (Label::textColourId, Colour(0xFF4A997A));
+    bpmLabel.setColour (TextEditor::textColourId, Colours::black);
 }
 
 /*
@@ -417,84 +479,92 @@ void AkatekoAudioProcessorEditor::initialiseDisplayLabel(){
 
 void AkatekoAudioProcessorEditor::initialiseModulationContainer(){
     // LFO One Button
-    addAndMakeVisible (lfoOneButton = new TextButton ("lfoOne"));
+
+    addAndMakeVisible (lfoOneButton = new ImageButton ("lfoOne"));
     lfoOneButton->setButtonText (TRANS("LFO 1"));
     lfoOneButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     lfoOneButton->addListener (this);
-    lfoOneButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    lfoOneButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    lfoOneButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
-    // LFO Two Button
-    addAndMakeVisible (lfoTwoButton = new TextButton ("lfoTwo"));
+
+    lfoOneButton->setImages (false, true, false,
+                             ImageCache::getFromMemory (BinaryData::lfo1Off_png, BinaryData::lfo1Off_pngSize), 1.000f, Colour (0x00000000),
+                             ImageCache::getFromMemory (BinaryData::lfo1On_png, BinaryData::lfo1On_pngSize), 0.75f, Colour (0x7F709F9F),
+                             ImageCache::getFromMemory (BinaryData::lfo1On_png, BinaryData::lfo1On_pngSize), 1.000f, Colour (0x1f000000));
+
+    addAndMakeVisible (lfoTwoButton = new ImageButton ("lfoTwo"));
     lfoTwoButton->setButtonText (TRANS("LFO 2"));
     lfoTwoButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     lfoTwoButton->addListener (this);
-    lfoTwoButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    lfoTwoButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    lfoTwoButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
-    // ENV One Button
-    addAndMakeVisible (envOneButton = new TextButton ("envOneButton"));
+
+    lfoTwoButton->setImages (false, true, false,
+                             ImageCache::getFromMemory (BinaryData::lfo2Off_png, BinaryData::lfo2Off_pngSize), 1.000f, Colour (0x00000000),
+                             ImageCache::getFromMemory (BinaryData::lfo2On_png, BinaryData::lfo2On_pngSize), 0.75f, Colour (0x7F709F9F),
+                             ImageCache::getFromMemory (BinaryData::lfo2On_png, BinaryData::lfo2On_pngSize), 1.000f, Colour (0x1f000000));
+
+    addAndMakeVisible (envOneButton = new ImageButton ("envOneButton"));
     envOneButton->setButtonText (TRANS("ENV 1"));
     envOneButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     envOneButton->addListener (this);
-    envOneButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    envOneButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    envOneButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
-    // ENV Two Button
-    addAndMakeVisible (envTwoButton = new TextButton ("envTwo"));
+
+    envOneButton->setImages (false, true, false,
+                             ImageCache::getFromMemory (BinaryData::env1Off_png, BinaryData::env1Off_pngSize), 1.000f, Colour (0x00000000),
+                             ImageCache::getFromMemory (BinaryData::env1On_png, BinaryData::env1On_pngSize), 0.75f, Colour (0x7F709F9F),
+                             ImageCache::getFromMemory (BinaryData::env1On_png, BinaryData::env1On_pngSize), 1.000f, Colour (0x1f000000));
+
+    addAndMakeVisible (envTwoButton = new ImageButton ("envTwo"));
     envTwoButton->setButtonText (TRANS("ENV 2"));
     envTwoButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     envTwoButton->addListener (this);
-    envTwoButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    envTwoButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    envTwoButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
-    // Step Button
-    addAndMakeVisible (stepButton = new TextButton ("stepButton"));
+
+    envTwoButton->setImages (false, true, false,
+                             ImageCache::getFromMemory (BinaryData::env2Off_png, BinaryData::env2Off_pngSize), 1.000f, Colour (0x00000000),
+                             ImageCache::getFromMemory (BinaryData::env2on_png, BinaryData::env2on_pngSize), 0.75f, Colour (0x7F709F9F),
+                             ImageCache::getFromMemory (BinaryData::env2on_png, BinaryData::env2on_pngSize), 1.000f, Colour (0x1f000000));
+
+    addAndMakeVisible (stepButton = new ImageButton ("stepButton"));
     stepButton->setButtonText (TRANS("STEP"));
-    stepButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
+    stepButton->setConnectedEdges (Button::ConnectedOnBottom);
     stepButton->addListener (this);
-    stepButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    stepButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    stepButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
-    // Modulation Button
-    addAndMakeVisible (modulationButton = new TextButton ("modButton"));
+
+    stepButton->setImages (false, true, false,
+                           ImageCache::getFromMemory (BinaryData::stepOff_png, BinaryData::stepOff_pngSize), 1.000f, Colour (0x00000000),
+                           ImageCache::getFromMemory (BinaryData::stepOn_png, BinaryData::stepOn_pngSize), 0.75f, Colour (0x7F709F9F),
+                           ImageCache::getFromMemory (BinaryData::stepOn_png, BinaryData::stepOn_pngSize), 1.000f, Colour (0x1f000000));
+
+    addAndMakeVisible (modulationButton = new ImageButton ("modButton"));
     modulationButton->setButtonText (TRANS("MOD"));
     modulationButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     modulationButton->addListener (this);
-    modulationButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    modulationButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    modulationButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
-    // Preset Button
-    addAndMakeVisible (presetButton = new TextButton ("preset"));
+
+    modulationButton->setImages (false, true, false,
+                                 ImageCache::getFromMemory (BinaryData::modOff_png, BinaryData::modOff_pngSize), 1.000f, Colour (0x00000000),
+                                 ImageCache::getFromMemory (BinaryData::modOn_png, BinaryData::modOn_pngSize), 0.75f, Colour (0x7F709F9F),
+                                 ImageCache::getFromMemory (BinaryData::modOn_png, BinaryData::modOn_pngSize), 1.000f, Colour (0x1f000000));
+
+    addAndMakeVisible (presetButton = new ImageButton ("preset"));
     presetButton->setButtonText (TRANS("PRESET"));
     presetButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     presetButton->addListener (this);
-    presetButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    presetButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    presetButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
-    currentBPM = processor.getBPM();
-    beatDivisor.calculateBeatDivisions(currentBPM);
+    presetButton->setImages (false, true, false,
+                             ImageCache::getFromMemory (BinaryData::presetOff_png, BinaryData::presetOff_pngSize), 1.000f, Colour (0x00000000),
+                             ImageCache::getFromMemory (BinaryData::presetOn_png, BinaryData::presetOn_pngSize), 0.75f, Colour (0x7F709F9F),
+                             ImageCache::getFromMemory (BinaryData::presetOn_png, BinaryData::presetOn_pngSize), 1.000f, Colour (0x1f000000));
+
+
+    currentBPM = processor.getBeatsPerMinute();
+
     /* Gather Parameters and ParamIds */
     addChildComponent(lfoOne = new LFOComponent("LFO 1", processor, 1, paramLabel));
-    lfoOne->setBeatDivisionStrings(beatDivisor.getStringArray());
-    lfoOne->setBeatDivisionValues(beatDivisor.getValues());
-    lfoOne->initFrequencySlider();
+    lfoOne->calculateTimeDivision(currentBPM);
 
     addChildComponent(lfoTwo = new LFOComponent("LFO 2", processor, 2, paramLabel));
-    lfoTwo->setBeatDivisionStrings(beatDivisor.getStringArray());
-    lfoTwo->setBeatDivisionValues(beatDivisor.getValues());
-    lfoTwo->initFrequencySlider();
+    lfoTwo->calculateTimeDivision(currentBPM);
 
     addChildComponent(envOne = new EnvelopeComponent("ENV 1", processor, 1, paramLabel));
-    envOne->setBeatDivisionStrings(beatDivisor.getStringArray());
-    envOne->setBeatDivisionValues(beatDivisor.getValues());
-    envOne->initDurationSlider();
+    envOne->calculateTimeDivision(currentBPM);
 
     addChildComponent(envTwo = new EnvelopeComponent("ENV 2", processor, 2, paramLabel));
-    envTwo->setBeatDivisionStrings(beatDivisor.getStringArray());
-    envTwo->setBeatDivisionValues(beatDivisor.getValues());
-    envTwo->initDurationSlider();
+    envTwo->calculateTimeDivision(currentBPM);
 
     addChildComponent(stepSeq = new StepSequencerComponent("SSEQ", processor, paramLabel));
 
@@ -513,36 +583,16 @@ void AkatekoAudioProcessorEditor::initialiseModulationContainer(){
     activeModulation = LFO1;
     lfoOneButton->setColour(TextButton::buttonColourId, activeColour);
 
-    /* setCurrentShapes, only for testing when the preset
-     * mechanism is properly implemented load up the correct
-     * preset and everything should be set accordingly
-     * by a default preset or the current selected preset
-     * of the project.
-     */
-    if(!processor.shapesInitialised()){
-       std::cout << "Entered start up" << std::endl;
-
-       processor.setShapes(lfoOne->getCurrentShapes(),AkatekoAudioProcessor::LFO1Id);
-       processor.setShapes(lfoTwo->getCurrentShapes(),AkatekoAudioProcessor::LFO2Id);
-       processor.setShapes(waveShaper->getCurrentShapes(),AkatekoAudioProcessor::WaveShapeId);
-
-       processor.setUIState(envOne->getUIState(), AkatekoAudioProcessor::Envelope1Id);
-       processor.setUIState(envTwo->getUIState(), AkatekoAudioProcessor::Envelope2Id);
-       processor.setUIState(stepSeq->getUIState(), AkatekoAudioProcessor::StepSequencerId);
-
-       processor.setShapesInitialised(true);
-    } else {
-        /* If the editor is recreated retrieve stored shapes */
-       lfoOne->setCurrentShapes(processor.getShapes(AkatekoAudioProcessor::LFO1Id));
-       lfoTwo->setCurrentShapes(processor.getShapes(AkatekoAudioProcessor::LFO2Id));
-
-       envOne->setUIState(processor.getUIState(AkatekoAudioProcessor::Envelope1Id));
-       envTwo->setUIState(processor.getUIState(AkatekoAudioProcessor::Envelope2Id));
-
-       stepSeq->setUIState(processor.getUIState(AkatekoAudioProcessor::StepSequencerId));
-       waveShaper->setCurrentShapes(processor.getShapes(AkatekoAudioProcessor::WaveShapeId));
+    // Retrieve Shapes
+    lfoOne->setCurrentShapes(processor.getShapes(AkatekoAudioProcessor::LFO1Id));
+    lfoTwo->setCurrentShapes(processor.getShapes(AkatekoAudioProcessor::LFO2Id));
+    envOne->setUIState(processor.getUIState(AkatekoAudioProcessor::Envelope1Id));
+    envTwo->setUIState(processor.getUIState(AkatekoAudioProcessor::Envelope2Id));
+    stepSeq->setUIState(processor.getUIState(AkatekoAudioProcessor::StepSequencerId));
+    waveShaper->setCurrentShapes(processor.getShapes(AkatekoAudioProcessor::WaveShapeId));
      //  xyPad->restoreFromString(processor.getUIState(AkatekoAudioProcessor::xyPadId));
-    }
+
+    modInitialized = true;
 }
 
 void AkatekoAudioProcessorEditor::initialiseEffectContainer(){
@@ -561,49 +611,104 @@ void AkatekoAudioProcessorEditor::initialiseEffectContainer(){
 }
 
 void AkatekoAudioProcessorEditor::initialiseToolBarSection(){
-    addAndMakeVisible (loadPresetButton = new TextButton ("loadPresetButton"));
-    loadPresetButton->setButtonText (TRANS("load"));
+    addAndMakeVisible (loadPresetButton = new ImageButton ("loadPresetButton"));
+    loadPresetButton->setImages (false, true, false,
+                                 ImageCache::getFromMemory (BinaryData::loadOnV2_png, BinaryData::loadOnV2_pngSize), 1.000f, Colour (0x5F000000),
+                                 ImageCache::getFromMemory (BinaryData::loadOnV2_png, BinaryData::loadOnV2_pngSize), 0.75f, Colour (0x7F709F9F),
+                                 ImageCache::getFromMemory (BinaryData::loadOnV2_png, BinaryData::loadOnV2_pngSize), 1.000f, Colour (0x4f000000));
     loadPresetButton->addListener (this);
-    loadPresetButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    loadPresetButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    loadPresetButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
-    addAndMakeVisible (savePresetButton = new TextButton ("savePresetButton"));
-    savePresetButton->setButtonText (TRANS("save"));
+    addAndMakeVisible (savePresetButton = new ImageButton ("savePresetButton"));
+    savePresetButton->setImages (false, true, false,
+                                 ImageCache::getFromMemory (BinaryData::saveOnV2_png, BinaryData::saveOnV2_pngSize), 1.000f, Colour (0x5F000000),
+                                 ImageCache::getFromMemory (BinaryData::saveOnV2_png, BinaryData::saveOffV2_pngSize), 0.75f, Colour (0x7F709F9F),
+                                 ImageCache::getFromMemory (BinaryData::saveOnV2_png, BinaryData::saveOffV2_pngSize), 1.000f, Colour (0x4f000000));
+
     savePresetButton->addListener (this);
-    savePresetButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    savePresetButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    savePresetButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
+
+
+    const OwnedArray<AudioProcessorParameter> &params = processor.getParameters();
+    paramIndices = processor.getParameterIndices(AkatekoAudioProcessor::GlobalId);
+    StringArray paramIds = processor.getParameterIds(AkatekoAudioProcessor::GlobalId);
+
+    midiStrings.clear();
+
+    if(paramIndices.size() == 2 &&
+       paramIds.size() == 2 &&
+       params.size() >= paramIndices[1])
+    {
+       requestMenuId[0] = paramIds[0].hash();
+       requestMenuId[1] = paramIds[1].hash();
+
+       midiStrings.add("Global: In Volume");
+       midiStrings.add(" Global: Out Volume");
+
+       addAndMakeVisible (InputVolumeSlider = new IgnoreRightClick<Slider> (paramIds[0]));
+       inputVolume = params.getUnchecked(paramIndices[0]);
+
+       addAndMakeVisible (mainVolumeSlider = new IgnoreRightClick<Slider> (paramIds[1]));
+       outputVolume = params.getUnchecked(paramIndices[1]);
+
+    } else {
+        std::cerr << "AkatekoAudioProcessor::initialiseToolBarSection" << std::endl;
+        std::cerr << "Parameters are not bound properly" <<  std::endl;
+
+        addAndMakeVisible (InputVolumeSlider = new Slider ("Input"));
+        addAndMakeVisible (mainVolumeSlider = new Slider ("mainVolume"));
+    }
+
+    InputVolumeSlider->setRange (0, 2, 0);
+    InputVolumeSlider->setSliderStyle (Slider::RotaryHorizontalDrag);
+    InputVolumeSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
+    InputVolumeSlider->setSkewFactor(0.31f);
+    InputVolumeSlider->setDoubleClickReturnValue(true, 1.0f);
+    InputVolumeSlider->addListener(this);
+
+    mainVolumeSlider->setRange (0, 2, 0);
+    mainVolumeSlider->setSliderStyle (Slider::RotaryHorizontalDrag);
+    mainVolumeSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
+    mainVolumeSlider->setSkewFactor(0.31f);
+    mainVolumeSlider->setDoubleClickReturnValue(true, 1.0f);
+    mainVolumeSlider->addListener(this);
+
+    // Load previous Values
+    if(inputVolume != nullptr){
+        InputVolumeSlider->setValue(inputVolume->getValue());
+    }
+
+    if(outputVolume != nullptr){
+        mainVolumeSlider->setValue(outputVolume->getValue());
+    }
 }
 /* If a current modulation Component is visible, hide it */
 void AkatekoAudioProcessorEditor::hideModulationComponent(int modComponentId){
     switch(modComponentId){
         case LFO1:
-            lfoOneButton->setColour(TextButton::buttonColourId, buttonColour);
+            lfoOneButton->setState(ImageButton::buttonNormal);
             lfoOne->setVisible(false);
             break;
         case LFO2:
-            lfoTwoButton->setColour(TextButton::buttonColourId, buttonColour);
+            lfoTwoButton->setState(ImageButton::buttonNormal);
             lfoTwo->setVisible(false);
             break;
         case ENV1:
-            envOneButton->setColour(TextButton::buttonColourId, buttonColour);
+            envOneButton->setState(ImageButton::buttonNormal);
             envOne->setVisible(false);
             break;
         case ENV2:
-            envTwoButton->setColour(TextButton::buttonColourId, buttonColour);
+            envTwoButton->setState(ImageButton::buttonNormal);
             envTwo->setVisible(false);
             break;
         case SSEQ:
-            stepButton->setColour(TextButton::buttonColourId, buttonColour);
+            stepButton->setState(ImageButton::buttonNormal);
             stepSeq->setVisible(false);
             break;
         case MODM:
-            modulationButton->setColour(TextButton::buttonColourId, buttonColour);
+            modulationButton->setState(ImageButton::buttonNormal);
             modMatrix->setVisible(false);
             break;
         case PRST:
-            presetButton->setColour(TextButton::buttonColourId, buttonColour);
+            presetButton->setState(ImageButton::buttonNormal);
             preset->setVisible(false);
             break;
     }
@@ -638,6 +743,167 @@ void AkatekoAudioProcessorEditor::updateGui(){
 
     modMatrix->updateGui();
 
+}
+
+void AkatekoAudioProcessorEditor::setButtonState(ImageButton *button){
+   const int tmpState = button->getState();
+
+   if(tmpState != ImageButton::buttonOver){
+       button->setState(ImageButton::buttonDown);
+   }
+}
+
+void AkatekoAudioProcessorEditor::paintOverChildren(Graphics &g){
+    if(!backPanel->isVisible()){
+        g.setGradientFill(overlay);
+        g.fillRoundedRectangle(102, 338, 515, 250, 2.f);
+    }
+}
+
+void AkatekoAudioProcessorEditor::sliderValueChanged(Slider *slider){
+    if(slider == InputVolumeSlider){
+        const double tmpValue = InputVolumeSlider->getValue();
+        double dbValue = msm::dbConversion(tmpValue);
+
+        if(dbValue > 6.00){
+            dbValue = 6.00;
+        }
+
+        const String tmpLabel = InputVolumeSlider->getName() +
+                                String(dbValue, 2) +
+                                String("dB");
+
+
+        if(inputVolume != nullptr){
+            inputVolume->setValue(tmpValue);
+        }
+
+        paramLabel.setText(tmpLabel, dontSendNotification);
+    } else if(slider == mainVolumeSlider){
+        const double tmpValue = mainVolumeSlider->getValue();
+        double dbValue = msm::dbConversion(tmpValue);
+
+        if(dbValue > 6.00){
+            dbValue = 6.00;
+        }
+        const String tmpLabel = mainVolumeSlider->getName() +
+                                String(dbValue, 2) +
+                                String("dB");
+
+        if(outputVolume != nullptr){
+            outputVolume->setValue(tmpValue);
+        }
+
+        paramLabel.setText(tmpLabel, dontSendNotification);
+    }
+}
+
+bool AkatekoAudioProcessorEditor::keyPressed(const KeyPress &key){
+    if(key == KeyPress::spaceKey){
+        processor.printPositionInfo();
+    } else if(key == KeyPress::tabKey || key == KeyPress::F1Key){
+        if(backPanel->isVisible()){
+            backPanel->setVisible(false);
+        } else {
+            backPanel->setVisible(true);
+        }
+    }
+
+    return false;
+}
+
+//Timer Callback
+void AkatekoAudioProcessorEditor::timerCallback(){
+    if(processor.getMidiLearnStatus()){
+        midiLearnFlash = midiLearnFlash & 0B1111;
+
+        if(midiLearnFlash < 12){
+            paramLabel.setText("MIDI Learn : Waiting for input", sendNotificationAsync);
+        } else {
+            paramLabel.setText("MIDI Learn : ", sendNotificationAsync);
+        }
+
+        midiLearnFlash ++;
+    } else {
+        if(processor.getMidiMsgBoundStatus()){
+            String message = processor.getMidiMessageBounded();
+            message += "bounded";
+
+            paramLabel.setText(message, sendNotificationAsync);
+        }
+        midiLearnFlash = 0;
+    }
+
+    // Make it possible to gather the arrayIndex that needs to be
+    // updated i.e. the individual widget instead of brute force
+    // updating the whole gui class.
+    if(processor.requestGuiUpdate()){
+        vector<bool> updateSection = processor.getUpdatedSections();
+
+        for(int i=0; i<updateSection.size(); i++){
+            if(updateSection[i]){
+                updateGuiSection(i);
+            }
+        }
+    }
+}
+
+
+
+void AkatekoAudioProcessorEditor::updateGuiSection(int section){
+    switch(section){
+        case AkatekoAudioProcessor::GlobalId:
+            if(inputVolume != nullptr){
+                InputVolumeSlider->setValue(inputVolume->getValue());
+            }
+
+            if(outputVolume != nullptr){
+                mainVolumeSlider->setValue(outputVolume->getValue());
+            }
+
+            break;
+        case AkatekoAudioProcessor::FilterId:
+            filter->updateGui();
+            break;
+        case AkatekoAudioProcessor::WaveShapeId:
+            waveShaper->updateGui();
+            break;
+        case AkatekoAudioProcessor::LFO1Id:
+            if(lfoOne->isVisible()){
+                lfoOne->updateGui();
+            }
+            break;
+        case AkatekoAudioProcessor::LFO2Id:
+            if(lfoTwo->isVisible()){
+                lfoTwo->updateGui();
+            }
+            break;
+        case AkatekoAudioProcessor::Envelope1Id:
+            if(envOne->isVisible()){
+                envOne->updateGui();
+            }
+            break;
+        case AkatekoAudioProcessor::Envelope2Id:
+            if(envTwo->isVisible()){
+                envTwo->updateGui();
+            }
+            break;
+        case AkatekoAudioProcessor::StepSequencerId:
+            if(stepSeq->isVisible()){
+                stepSeq->updateGui();
+            }
+            break;
+        case AkatekoAudioProcessor::xyPadId: /*Implement*/
+            std::cout << "Received update XY Pad" << std::endl;
+            xyPad->updateGui();
+            break;
+    }
+
+    if(section >= AkatekoAudioProcessor::FxContainerId &&
+       section <= AkatekoAudioProcessor::pReverbId)
+    {
+         fxContainer->updateGui();
+    }
 }
 
 //[/MiscUserCode]
@@ -682,38 +948,38 @@ BEGIN_JUCER_METADATA
     <TEXT pos="377 67 141 21" fill="solid: ffaaaaaa" hasStroke="0" text="WAVESHAPER"
           fontname="Good Times" fontsize="16" bold="0" italic="0" justification="36"/>
   </BACKGROUND>
-  <TEXTBUTTON name="lfoOne" id="3be90a7d038cacae" memberName="lfoOneButton"
-              virtualName="" explicitFocusOrder="0" pos="24 352 70 30" bgColOff="73707070"
-              bgColOn="ff464646" textCol="fff0f0f0" buttonText="LFO 1" connectedEdges="12"
-              needsCallback="1" radioGroupId="0"/>
-  <TEXTBUTTON name="lfoTwo" id="8a5cdd3b15902e28" memberName="lfoTwoButton"
-              virtualName="" explicitFocusOrder="0" pos="24 384 70 30" bgColOff="73707070"
-              bgColOn="ff464646" textCol="fff0f0f0" buttonText="LFO 2" connectedEdges="12"
-              needsCallback="1" radioGroupId="0"/>
-  <TEXTBUTTON name="envOneButton" id="bdaf7e11ea200503" memberName="envOneButton"
-              virtualName="" explicitFocusOrder="0" pos="24 416 70 30" bgColOff="73707070"
-              bgColOn="ff464646" textCol="fff0f0f0" buttonText="ENV 1" connectedEdges="12"
-              needsCallback="1" radioGroupId="0"/>
-  <TEXTBUTTON name="envTwo" id="18bd76a767b49aa8" memberName="envTwoButton"
-              virtualName="" explicitFocusOrder="0" pos="24 448 70 30" bgColOff="73707070"
-              bgColOn="ff464646" textCol="fff0f0f0" buttonText="ENV 2" connectedEdges="12"
-              needsCallback="1" radioGroupId="0"/>
-  <TEXTBUTTON name="stepButton" id="161d2f193b2d1e9c" memberName="stepButton"
-              virtualName="" explicitFocusOrder="0" pos="24 480 70 30" bgColOff="73707070"
-              bgColOn="ff464646" textCol="fff0f0f0" buttonText="STEP" connectedEdges="12"
-              needsCallback="1" radioGroupId="0"/>
-  <TEXTBUTTON name="modButton" id="411aa6c03fa5468d" memberName="modulationButton"
-              virtualName="" explicitFocusOrder="0" pos="24 512 70 30" bgColOff="73707070"
-              bgColOn="ff464646" textCol="fff0f0f0" buttonText="MOD" connectedEdges="12"
-              needsCallback="1" radioGroupId="0"/>
-  <TEXTBUTTON name="savePresetButton" id="2a6f9b9c2a0b2c96" memberName="loadPresetButton"
-              virtualName="" explicitFocusOrder="0" pos="320 8 32 20" bgColOff="73707070"
-              bgColOn="ff464646" textCol="fff0f0f0" buttonText="load" connectedEdges="3"
-              needsCallback="1" radioGroupId="0"/>
-  <TEXTBUTTON name="new button" id="48fac67238ae71fe" memberName="savePresetButton"
-              virtualName="" explicitFocusOrder="0" pos="320 32 32 20" bgColOff="73707070"
-              bgColOn="ff464646" textCol="fff0f0f0" buttonText="save" connectedEdges="3"
-              needsCallback="1" radioGroupId="0"/>
+  <IMAGEBUTTON name="lfoOne" id="3be90a7d038cacae" memberName="lfoOneButton"
+               virtualName="" explicitFocusOrder="0" pos="24 352 70 30" bgColOff="73707070"
+               bgColOn="ff464646" textCol="fff0f0f0" buttonText="LFO 1" connectedEdges="12"
+               needsCallback="1" radioGroupId="0"/>
+  <IMAGEBUTTON name="lfoTwo" id="8a5cdd3b15902e28" memberName="lfoTwoButton"
+               virtualName="" explicitFocusOrder="0" pos="24 384 70 30" bgColOff="73707070"
+               bgColOn="ff464646" textCol="fff0f0f0" buttonText="LFO 2" connectedEdges="12"
+               needsCallback="1" radioGroupId="0"/>
+  <IMAGEBUTTON name="envOneButton" id="bdaf7e11ea200503" memberName="envOneButton"
+               virtualName="" explicitFocusOrder="0" pos="24 416 70 30" bgColOff="73707070"
+               bgColOn="ff464646" textCol="fff0f0f0" buttonText="ENV 1" connectedEdges="12"
+               needsCallback="1" radioGroupId="0"/>
+  <IMAGEBUTTON name="envTwo" id="18bd76a767b49aa8" memberName="envTwoButton"
+               virtualName="" explicitFocusOrder="0" pos="24 448 70 30" bgColOff="73707070"
+               bgColOn="ff464646" textCol="fff0f0f0" buttonText="ENV 2" connectedEdges="12"
+               needsCallback="1" radioGroupId="0"/>
+  <IMAGEBUTTON name="stepButton" id="161d2f193b2d1e9c" memberName="stepButton"
+               virtualName="" explicitFocusOrder="0" pos="24 480 70 30" bgColOff="73707070"
+               bgColOn="ff464646" textCol="fff0f0f0" buttonText="STEP" connectedEdges="12"
+               needsCallback="1" radioGroupId="0"/>
+  <IMAGEBUTTON name="modButton" id="411aa6c03fa5468d" memberName="modulationButton"
+               virtualName="" explicitFocusOrder="0" pos="24 512 70 30" bgColOff="73707070"
+               bgColOn="ff464646" textCol="fff0f0f0" buttonText="MOD" connectedEdges="12"
+               needsCallback="1" radioGroupId="0"/>
+  <ImageButton name="savePresetButton" id="2a6f9b9c2a0b2c96" memberName="loadPresetButton"
+               virtualName="" explicitFocusOrder="0" pos="320 8 32 20" bgColOff="73707070"
+               bgColOn="ff464646" textCol="fff0f0f0" buttonText="load" connectedEdges="3"
+               needsCallback="1" radioGroupId="0"/>
+  <ImageButton name="new button" id="48fac67238ae71fe" memberName="savePresetButton"
+               virtualName="" explicitFocusOrder="0" pos="320 32 32 20" bgColOff="73707070"
+               bgColOn="ff464646" textCol="fff0f0f0" buttonText="save" connectedEdges="3"
+               needsCallback="1" radioGroupId="0"/>
   <SLIDER name="Input" id="6336a7102808882a" memberName="InputVolumeSlider"
           virtualName="Slider" explicitFocusOrder="0" pos="10 11 40 40"
           min="0.010000000000000000208" max="2" int="0" style="RotaryVerticalDrag"
@@ -739,10 +1005,10 @@ BEGIN_JUCER_METADATA
           min="0.010000000000000000208" max="2" int="0" style="RotaryVerticalDrag"
           textBoxPos="NoTextBox" textBoxEditable="0" textBoxWidth="80"
           textBoxHeight="20" skewFactor="1" needsCallback="0"/>
-  <TEXTBUTTON name="preset" id="6d9d037c6aab172b" memberName="presetButton"
-              virtualName="" explicitFocusOrder="0" pos="24 544 70 30" bgColOff="73707070"
-              bgColOn="ff464646" textCol="fff0f0f0" buttonText="PRESET" connectedEdges="12"
-              needsCallback="1" radioGroupId="0"/>
+  <IMAGEBUTTON name="preset" id="6d9d037c6aab172b" memberName="presetButton"
+               virtualName="" explicitFocusOrder="0" pos="24 544 70 30" bgColOff="73707070"
+               bgColOn="ff464646" textCol="fff0f0f0" buttonText="PRESET" connectedEdges="12"
+               needsCallback="1" radioGroupId="0"/>
   <LABEL name="presetLabel" id="ef58931134b9d2d8" memberName="presetLabel"
          virtualName="" explicitFocusOrder="0" pos="368 9 248 18" bkgCol="7f2d0000"
          textCol="ffdfdfdf" edTextCol="ff000000" edBkgCol="0" labelText="Preset Name &#10;"

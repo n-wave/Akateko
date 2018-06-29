@@ -49,8 +49,8 @@ PresetComponent::PresetComponent (const String &name, AkatekoAudioProcessor &p, 
       processor(p),
       presetLabel(prstLabel),
       paramLabel(prmLabel),
-      buttonColour(Colour(0x73707070)),
-      activeColour(Colour(0x7f007f7f))
+      buttonColour(Colour(0x3F10A0A0)),
+      activeColour(Colour(0x9F20BFaF))
 {
     //[Constructor_pre] You can add your own custom stuff here..
     //[Constructor_pre] You can add your own custom stuff here..
@@ -59,25 +59,16 @@ PresetComponent::PresetComponent (const String &name, AkatekoAudioProcessor &p, 
     loadButton->setButtonText (TRANS("Load"));
     loadButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     loadButton->addListener (this);
-    loadButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    loadButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    loadButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
     addAndMakeVisible (saveButton = new TextButton ("saveButton"));
     saveButton->setButtonText (TRANS("Save"));
     saveButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     saveButton->addListener (this);
-    saveButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    saveButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    saveButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
     addAndMakeVisible (clearButton = new TextButton ("clearButton"));
     clearButton->setButtonText (TRANS("Clear"));
     clearButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     clearButton->addListener (this);
-    clearButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    clearButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    clearButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
     addAndMakeVisible (presetTableComponent = new PresetTable(processor.getCurrentPresets()));
     presetTableComponent->setName ("presetTable");
@@ -87,57 +78,38 @@ PresetComponent::PresetComponent (const String &name, AkatekoAudioProcessor &p, 
     nameLabel->setFont (Font ("Good Times", 15.00f, Font::plain));
     nameLabel->setJustificationType (Justification::centredLeft);
     nameLabel->setEditable (false, false, false);
-    nameLabel->setColour (Label::textColourId, Colours::white);
-    nameLabel->setColour (TextEditor::textColourId, Colours::black);
+    nameLabel->setColour (Label::textColourId, Colour(0xFF4A997A));
     nameLabel->setColour (TextEditor::backgroundColourId, Colour (0x00000000));
 
     addAndMakeVisible (saveAsButton = new TextButton ("saveAsButton"));
     saveAsButton->setButtonText (TRANS("Save As"));
     saveAsButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     saveAsButton->addListener (this);
-    saveAsButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    saveAsButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    saveAsButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
     addAndMakeVisible (deleteButton = new TextButton ("deleteButton"));
     deleteButton->setButtonText (TRANS("Delete"));
     deleteButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     deleteButton->addListener (this);
-    deleteButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    deleteButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    deleteButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
     addAndMakeVisible (sortNameButton = new TextButton ("sortNameButton"));
     sortNameButton->setButtonText (TRANS("Name"));
     sortNameButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     sortNameButton->addListener (this);
-    sortNameButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    sortNameButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    sortNameButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
     addAndMakeVisible (sortCategoryButton = new TextButton ("sortCategoryButton"));
     sortCategoryButton->setButtonText (TRANS("Category"));
     sortCategoryButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     sortCategoryButton->addListener (this);
-    sortCategoryButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    sortCategoryButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    sortCategoryButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
     addAndMakeVisible (sortAuthorButton = new TextButton ("sortAuthorButton"));
     sortAuthorButton->setButtonText (TRANS("Author"));
     sortAuthorButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     sortAuthorButton->addListener (this);
-    sortAuthorButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    sortAuthorButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    sortAuthorButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
     addAndMakeVisible (folderButton = new TextButton ("folderButton"));
     folderButton->setButtonText (TRANS("Folder"));
     folderButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     folderButton->addListener (this);
-    folderButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    folderButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    folderButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
     addAndMakeVisible (textEditor = new TextEditor ("new text editor"));
     textEditor->setVisible(false);
@@ -147,6 +119,7 @@ PresetComponent::PresetComponent (const String &name, AkatekoAudioProcessor &p, 
     textEditor->setScrollbarsShown (false);
     textEditor->setCaretVisible (true);
     textEditor->setPopupMenuEnabled (false);
+    textEditor->setInputRestrictions(4, "0123456789-");
     textEditor->addListener(this);
     //[/Constructor_pre]
 
@@ -193,6 +166,7 @@ PresetComponent::~PresetComponent()
 void PresetComponent::paint (Graphics& g)
 {
     //[UserPrePaint] Add your own custom painting code here..
+    g.fillAll(Colours::black);
     //[/UserPrePaint]
 
     //[UserPaint] Add your own custom painting code here..
@@ -208,7 +182,7 @@ void PresetComponent::resized()
     saveButton->setBounds (436, 48, 70, 20);
     clearButton->setBounds (436, 96, 70, 20);
     presetTableComponent->setBounds (5, 5, 420, 240);
-    nameLabel->setBounds (427, 5, 88, 16);
+    nameLabel->setBounds (427, 6, 88, 16);
     saveAsButton->setBounds (436, 72, 70, 20);
     deleteButton->setBounds (436, 120, 70, 20);
     sortNameButton->setBounds (436, 176, 70, 20);
@@ -449,12 +423,19 @@ void PresetComponent::buttonClicked (Button* buttonThatWasClicked)
 void PresetComponent::handleCommandMessage(int commandId){
     if(commandId == PresetTable::requestTextEditor){
         Rectangle<int> tmpBounds = presetTableComponent->getClickedCellPosition();
+        const int tmpColumn = presetTableComponent->getClickedColumn();
 
-        textEditor->setBounds(tmpBounds.getX()+5,
-                              tmpBounds.getY()+5,
-                              tmpBounds.getWidth(),
-                              tmpBounds.getHeight());
-
+        if(tmpColumn == 1){
+            textEditor->setBounds(tmpBounds.getX()+6,
+                                  tmpBounds.getY()+5,
+                                  tmpBounds.getWidth()-2,
+                                  tmpBounds.getHeight()-1);
+        } else {
+            textEditor->setBounds(tmpBounds.getX()+5,
+                                  tmpBounds.getY()+5,
+                                  tmpBounds.getWidth()-1,
+                                  tmpBounds.getHeight()-1);
+        }
 
         textEditor->setVisible(true);
         textEditor->grabKeyboardFocus();
@@ -541,6 +522,21 @@ void PresetComponent::SortPresets(int sorting){
 
         presetTableComponent->repaint();
     }
+}
+
+void PresetComponent::setLookAndFeel(LookAndFeel *laf)
+{
+    textEditor->setLookAndFeel(laf);
+    loadButton->setLookAndFeel(laf);
+    saveButton->setLookAndFeel(laf);
+    clearButton->setLookAndFeel(laf);
+    saveAsButton->setLookAndFeel(laf);
+    deleteButton->setLookAndFeel(laf);
+    sortNameButton->setLookAndFeel(laf);
+    sortCategoryButton->setLookAndFeel(laf);
+    sortAuthorButton->setLookAndFeel(laf);
+    folderButton->setLookAndFeel(laf);
+    presetTableComponent->setLookAndFeel(laf);
 }
 //[/MiscUserCode]
 

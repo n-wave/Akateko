@@ -28,6 +28,7 @@ public:
 
     void enableFilters(bool enable);
     void filterConfiguration(int config);
+    void setResonanceScalar(double scalar);
 
     // Filter One
     void enableFilterOne(bool enable);

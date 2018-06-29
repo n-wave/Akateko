@@ -25,9 +25,12 @@
 
 //[MiscUserDefs] You can add your own user definitions and misc code here...
 #include <iostream>
+#include "Akateko.h"
 
 using std::vector;
-
+using akateko::IgnoreRightClick;
+using akateko::MidiRow;
+using akateko::sseq_timing_ratios;
 /* initialiser list
  *
  *  Component::Component(name),
@@ -48,6 +51,7 @@ StepSequencerComponent::StepSequencerComponent (const String &name,AkatekoAudioP
     : Component::Component(name),
       processor(p),
       duration(nullptr),
+      beatsPerMinute(120.0),
       labelRef(label)
 {
     //[Constructor_pre] You can add your own custom stuff here..
@@ -67,17 +71,28 @@ StepSequencerComponent::StepSequencerComponent (const String &name,AkatekoAudioP
      *
      */
 
-    vector<int> paramIndices = p.getParameterIndices(AkatekoAudioProcessor::StepSequencerId);
+    paramIndices = p.getParameterIndices(AkatekoAudioProcessor::StepSequencerId);
     StringArray paramName = p.getParameterIds(AkatekoAudioProcessor::StepSequencerId);
 
     int nrOfParams = paramIndices.size();
 
     if(nrOfParams == 8){
+        requestMenuIds[0] = paramName[0].hash();
+        requestMenuIds[1] = paramName[1].hash();
+        requestMenuIds[2] = paramName[2].hash();
+        requestMenuIds[3] = paramName[3].hash();
+        requestMenuIds[4] = paramName[4].hash();
+        requestMenuIds[5] = paramName[5].hash();
+        requestMenuIds[6] = paramName[6].hash();
+        requestMenuIds[7] = paramName[7].hash();
+
+        initialiseMidiStrings();
+
         addAndMakeVisible(enableToggle = new ParamToggle(paramName[0], *p.getParameters().getUnchecked(paramIndices[0]), label));
         addAndMakeVisible(syncToggle = new ParamToggle(paramName[1], *p.getParameters().getUnchecked(paramIndices[1]), label));
         addAndMakeVisible(chopperToggle = new ParamToggle(paramName[2], *p.getParameters().getUnchecked(paramIndices[2]), label));
 
-        addAndMakeVisible(durationSlider = new Slider(paramName[3]));
+        addAndMakeVisible(durationSlider = new IgnoreRightClick<Slider>(paramName[3]));
         duration = p.getParameters().getUnchecked(paramIndices[3]);
 
         addAndMakeVisible(stepLengthSlider = new ParamSlider(paramName[4], *p.getParameters().getUnchecked(paramIndices[4]), label, 0.05f, 1.00));
@@ -104,8 +119,18 @@ StepSequencerComponent::StepSequencerComponent (const String &name,AkatekoAudioP
     addAndMakeVisible (stepSequencer = new StepSequencer ("sseq"));
     stepSequencer->setName ("stepSequencer");
 
+    stepSequencer->setColour(StepSequencer::backgroundColourId, Colours::black);
+    stepSequencer->setColour(StepSequencer::highLightColourId, Colour(0x2FFFFFFF));
+    stepSequencer->setColour(StepSequencer::outlineColourId, Colour(0xAA70C099));
+    stepSequencer->setColour(StepSequencer::fillGradientOneId, Colour(0xC070D0B0));
+    stepSequencer->setColour(StepSequencer::fillGradientTwoId, Colour(0x10007030));
+    stepSequencer->setColour(StepSequencer::stepOutlineColourId, Colour(0xBB40DFAA));
+    stepSequencer->setColour(StepSequencer::buttonOnColourId, Colour(0xB070D0B0));
+    stepSequencer->setColour(StepSequencer::buttonLinkedColourId, Colour(0xAA60C0A0));
+    stepSequencer->setColour(StepSequencer::overlayGradientTwoId, Colours::transparentBlack);
+
     stepLengthSlider->setRange (0, 1, 0);
-    stepLengthSlider->setSliderStyle (Slider::LinearHorizontal);
+    stepLengthSlider->setSliderStyle (Slider::LinearBar);
     stepLengthSlider->setTextBoxStyle (Slider::NoTextBox, false, 80, 20);
 
     enableToggle->setButtonText (String());
@@ -116,12 +141,12 @@ StepSequencerComponent::StepSequencerComponent (const String &name,AkatekoAudioP
     syncToggle->addListener (this);
 
     durationSlider->setRange(50.f, 5000.f, 0);
-    durationSlider->setSliderStyle (Slider::LinearHorizontal);
+    durationSlider->setSliderStyle (Slider::LinearBar);
     durationSlider->setTextBoxStyle (Slider::NoTextBox, false, 80, 20);
     durationSlider->addListener(this);
 
     stepComboBox->setEditableText (false);
-    stepComboBox->setJustificationType (Justification::centredLeft);
+    stepComboBox->setJustificationType (Justification::centred);
     stepComboBox->setTextWhenNothingSelected (TRANS("Step Amount"));
     stepComboBox->setTextWhenNoChoicesAvailable (TRANS("(no choices)"));
     stepComboBox->addItem (TRANS("8"), 1);
@@ -137,16 +162,15 @@ StepSequencerComponent::StepSequencerComponent (const String &name,AkatekoAudioP
     nameLabel->setFont (Font ("Good Times", 15.00f, Font::plain));
     nameLabel->setJustificationType (Justification::centredLeft);
     nameLabel->setEditable (false, false, false);
-    nameLabel->setColour (Label::textColourId, Colours::white);
-    nameLabel->setColour (TextEditor::textColourId, Colours::black);
+    nameLabel->setColour (Label::textColourId, Colour(0xFF4A997A));
     nameLabel->setColour (TextEditor::backgroundColourId, Colour (0x00000000));
 
     offsetSlider->setRange (0, 1, 0);
-    offsetSlider->setSliderStyle (Slider::LinearHorizontal);
+    offsetSlider->setSliderStyle (Slider::LinearBar);
     offsetSlider->setTextBoxStyle (Slider::NoTextBox, false, 80, 20);
 
     exponentSlider->setRange (0, 1, 0);
-    exponentSlider->setSliderStyle (Slider::LinearHorizontal);
+    exponentSlider->setSliderStyle (Slider::LinearBar);
     exponentSlider->setTextBoxStyle (Slider::NoTextBox, false, 80, 20);
     exponentSlider->setDoubleClickReturnValue(true, 0.5);
     exponentSlider->addListener(this);
@@ -155,15 +179,26 @@ StepSequencerComponent::StepSequencerComponent (const String &name,AkatekoAudioP
     chopperToggle->setButtonText (String());
     chopperToggle->addListener (this);
 
-    addAndMakeVisible (textButton = new TextButton ("new button"));
-    textButton->setButtonText (TRANS("t"));
-    textButton->addListener (this);
+
+    // Build Menu
+    menu.addItem(1, "learn", true, false, nullptr);
+    menu.addSeparator();
+    menu.addItem(0xFF, "clear");
     //[/UserPreSize]
 
     setSize (515, 250);
     //[Constructor] You can add your own custom stuff here..
+
+    double bpm = processor.getBeatsPerMinute();
+
+    if(bpm < 20.0){
+        bpm = 20.0;
+    }
+
+    beatsPerMinute = bpm;
+
     initialiseBeatDivision();
-    calculateBeatDivision(120.0); //standard
+    calculateBeatDivision(beatsPerMinute); //standard
     initDurationSlider();
     //[/Constructor]
 }
@@ -183,7 +218,6 @@ StepSequencerComponent::~StepSequencerComponent()
     offsetSlider = nullptr;
     exponentSlider = nullptr;
     chopperToggle = nullptr;
-    textButton = nullptr;
 
     //[Destructor]. You can add your own custom destruction code here..
     duration = nullptr;
@@ -196,31 +230,33 @@ void StepSequencerComponent::paint (Graphics& g)
     //[UserPrePaint] Add your own custom painting code here..
     //[/UserPrePaint]
 
-    g.fillAll (Colour (0xff323232));
+    g.fillAll (Colours::black);
 
-    g.setColour (Colour (0xffaaaaaa));
+    g.setColour (Colour (0xFF4A997A));
     g.setFont (Font ("Good Times", 11.00f, Font::plain));
-    g.drawText (TRANS("Length"),
-                436, 82, 52, 12,
-                Justification::centredLeft, true);
 
-    g.setColour (Colour (0xffaaaaaa));
-    g.setFont (Font ("Good Times", 11.00f, Font::plain));
     g.drawText (TRANS("duration"),
-                431, 40, 73, 10,
+                426, 30, 73, 10,
                 Justification::centredLeft, true);
 
-    g.setColour (Colour (0xffaaaaaa));
-    g.setFont (Font ("Good Times", 11.00f, Font::plain));
+
+    g.drawText (TRANS("Length"),
+                436, 74, 52, 12,
+                Justification::centredLeft, true);
+
+
     g.drawText (TRANS("offvalue"),
-                431, 126, 65, 12,
+                429, 119, 65, 12,
                 Justification::centred, true);
 
-    g.setColour (Colour (0xffaaaaaa));
-    g.setFont (Font ("Good Times", 11.00f, Font::plain));
     g.drawText (TRANS("curve"),
-                436, 166, 49, 12,
+                436, 164, 49, 12,
                 Justification::centred, true);
+
+    g.drawText (TRANS("steps"),
+                436, 210, 49, 12,
+                Justification::centred, true);
+
 
     //[UserPaint] Add your own custom painting code here..
     //[/UserPaint]
@@ -231,17 +267,23 @@ void StepSequencerComponent::resized()
     //[UserPreResize] Add your own custom resize code here..
     //[/UserPreResize]
 
+
     stepSequencer->setBounds (5, 5, 400, 240);
-    stepLengthSlider->setBounds (408, 96, 104, 20);
-    enableToggle->setBounds (494, 0, 24, 24);
-    syncToggle->setBounds (408, 32, 24, 24);
-    durationSlider->setBounds (408, 56, 104, 20);
-    stepComboBox->setBounds (412, 224, 96, 20);
-    nameLabel->setBounds (431, 1, 60, 24);
-    offsetSlider->setBounds (408, 136, 104, 20);
-    exponentSlider->setBounds (408, 184, 104, 20);
-    chopperToggle->setBounds (408, 160, 24, 24);
-    textButton->setBounds (408, 8, 23, 24);
+
+    enableToggle->setBounds (492, 1, 24, 24);
+    nameLabel->setBounds (431, 2, 60, 24);
+
+    durationSlider->setBounds (412, 46, 96, 16);
+    stepLengthSlider->setBounds (412, 91, 96, 16);
+    offsetSlider->setBounds (412, 136, 96, 16);
+    exponentSlider->setBounds (412, 181, 96, 16);
+    stepComboBox->setBounds (412, 226, 96, 16);
+
+
+    syncToggle->setBounds (493, 24, 20, 20);
+    chopperToggle->setBounds (493, 159, 20, 20);
+
+
     //[UserResized] Add your own custom resize handling here..
     //[/UserResized]
 }
@@ -261,15 +303,18 @@ void StepSequencerComponent::buttonClicked (Button* buttonThatWasClicked)
         //[UserButtonCode_syncToggle] -- add your button handler code here..
         double tmpDur = 0.0;
 
-        if(duration != nullptr){
+        if(duration != nullptr && !paramIndices.empty()){
             tmpDur = duration->getValue();
-
 
             const bool tmpSync = syncToggle->getToggleState();
             if(tmpSync){
                 const int tmpIndex = findClosestTimeDivision(tmpDur);
                 const double startDur =  valueBeatDivision[0];
                 const double endDur = valueBeatDivision[valueBeatDivision.size()-1];
+
+                if(processor.getRegisteredMidi(paramIndices[3])){
+                    processor.changeMidiRowMinMax(0, 17, akateko::MIDI_TO_INT, paramIndices[3]);
+                }
 
                 durationSlider->setRange(0, valueBeatDivision.size()-1);
                 durationSlider->setValue(tmpIndex, sendNotification);
@@ -283,6 +328,10 @@ void StepSequencerComponent::buttonClicked (Button* buttonThatWasClicked)
 
                 if(tmpDur <= 50.f){
                     tmpDur = 50.f;
+                }
+
+                if(processor.getRegisteredMidi(paramIndices[3])){
+                    processor.changeMidiRowMinMax(50.0, 5000.0, akateko::MIDI_TO_DOUBLE, paramIndices[3]);
                 }
 
                 durationSlider->setRange(50.f, 5000.f);
@@ -302,12 +351,6 @@ void StepSequencerComponent::buttonClicked (Button* buttonThatWasClicked)
         processor.updateChopCurve();
         //[/UserButtonCode_chopperToggle]
     }
-    else if (buttonThatWasClicked == textButton)
-    {
-        //[UserButtonCode_textButton] -- add your button handler code here..
-        //[/UserButtonCode_textButton]
-    }
-
     //[UserbuttonClicked_Post]
     //[/UserbuttonClicked_Post]
 }
@@ -393,23 +436,6 @@ void StepSequencerComponent::comboBoxChanged (ComboBox* comboBoxThatHasChanged)
     //[UsercomboBoxChanged_Post]
     //[/UsercomboBoxChanged_Post]
 }
-
-void StepSequencerComponent::handleCommandMessage (int commandId)
-{
-    //[UserCode_handleCommandMessage] -- Add your code here...
-    switch(commandId){
-        case StepSequencer::valuesUpdated:
-            processor.setStepValues(stepSequencer->getStepValues());
-            processor.setUIState(stepSequencer->toString(), AkatekoAudioProcessor::StepSequencerId);
-            break;
-        case StepSequencer::buttonsUpdated:
-            processor.setButtonStates(stepSequencer->getButtonStates());
-            processor.setUIState(stepSequencer->toString(), AkatekoAudioProcessor::StepSequencerId);
-            break;
-    }
-    //[/UserCode_handleCommandMessage]
-}
-
 //[MiscUserCode] You can add your own definitions of your custom methods or any other code here...
 
 void StepSequencerComponent::sliderDragEnded(Slider *sliderThatWasDragged){
@@ -453,27 +479,21 @@ void StepSequencerComponent::initialiseBeatDivision(){
 }
 
 void StepSequencerComponent::calculateBeatDivision(double bpm){
-    if(bpm > 0.0){
-        double T = 60000.0/bpm;
+    if(bpm > 0.0){       
+        if(beatsPerMinute != bpm){
+            double mult = beatsPerMinute/bpm;
+            double tmpValue = duration->getValue()*mult;
 
-        double tripNote = T*(2.0/3.0);
-        double wholeNote = T;
-        double dotNote = T*1.5;
+            beatsPerMinute = bpm;
+            duration->setValue(tmpValue);
+        }
+
+        double T = 60000/bpm;
 
         valueBeatDivision.clear();
 
-        valueBeatDivision.push_back(tripNote);
-        valueBeatDivision.push_back(wholeNote);
-        valueBeatDivision.push_back(dotNote);
-
-        for(int i=3; i<beatDivision.size(); i += 3){
-            tripNote *= 2.0;
-            wholeNote *= 2.0;
-            dotNote *= 2.0;
-
-            valueBeatDivision.push_back(tripNote);
-            valueBeatDivision.push_back(wholeNote);
-            valueBeatDivision.push_back(dotNote);
+        for(int i=0; i<beatDivision.size(); i++){
+            valueBeatDivision.push_back(T*sseq_timing_ratios[i]);
         }
     }
     initDurationSlider();
@@ -493,17 +513,22 @@ void StepSequencerComponent::initDurationSlider(){
 
             durationSlider->setRange(0, valueBeatDivision.size()-1);
             durationSlider->setValue(tmpIndex);
+
+            processor.setStepDurationBounds(valueBeatDivision[0],
+                                            valueBeatDivision[valueBeatDivision.size()-1]);
         } else {
-            if(tmpDur >= 5000.0f){
-                tmpDur = 5000.0f;
+            if(tmpDur >= 5000.0){
+                tmpDur = 5000.0;
             }
 
-            if(tmpDur <= 50.f){
-                tmpDur = 50.f;
+            if(tmpDur <= 50.0){
+                tmpDur = 50.0;
             }
 
-            durationSlider->setRange(50.0, 5000.0);
+            durationSlider->setRange(50, 5000.0);
             durationSlider->setValue(tmpDur);
+
+            processor.setStepDurationBounds(50, 5000.0);
         }
     } else {
         if(syncToggle == nullptr || duration == nullptr){
@@ -514,6 +539,23 @@ void StepSequencerComponent::initDurationSlider(){
             std::cerr << "Beat Division tables not set" << std::endl;
         }
     }
+}
+
+int StepSequencerComponent::getTimeDivisionIndex(vector<double> values, double period){
+    int index = 0;
+
+    while(index < values.size()){
+        double tmpValue = values[index];
+        double error = tmpValue*0.05;
+
+        if(period >= tmpValue-error &&
+           period <= tmpValue+error)
+        {
+            return index;
+        }
+        index++;
+    }
+    return 0;
 }
 
 int StepSequencerComponent::findClosestTimeDivision(double period){
@@ -559,9 +601,131 @@ void StepSequencerComponent::updateGui(){
     exponentSlider->postCommandMessage(ParamSlider::update);
     stepComboBox->postCommandMessage(ParamSlider::update);
 
+
+    if(paramIndices.size() == 8){
+        if(syncToggle->getToggleState()){
+            if(processor.getRegisteredMidi(paramIndices[3])){
+                processor.changeMidiRowMinMax(0, 17, akateko::MIDI_TO_INT, paramIndices[3]);
+            }
+        } else {
+            if(processor.getRegisteredMidi(paramIndices[3])){
+                processor.changeMidiRowMinMax(50.0, 5000.0, akateko::MIDI_TO_DOUBLE, paramIndices[3]);
+            }
+        }
+    }
+
     initDurationSlider();
     processor.setStepValues(stepSequencer->getStepValues());
     processor.setButtonStates(stepSequencer->getButtonStates());
+}
+
+void StepSequencerComponent::setLookAndFeel(LookAndFeel *laf){
+    stepLengthSlider->setLookAndFeel(laf);
+    enableToggle->setLookAndFeel(laf);
+    syncToggle->setLookAndFeel(laf);
+    stepComboBox->setLookAndFeel(laf);
+    durationSlider->setLookAndFeel(laf);
+    offsetSlider->setLookAndFeel(laf);
+    exponentSlider->setLookAndFeel(laf);
+    chopperToggle->setLookAndFeel(laf);
+    menu.setLookAndFeel(laf);
+}
+
+void StepSequencerComponent::initialiseMidiStrings(){
+    midiStrings.clear();
+
+    midiStrings.add(" Step Seq: Enable");
+    midiStrings.add(" Step Seq: Sync");
+    midiStrings.add(" Step Seq: Chop");
+    midiStrings.add(" Step Seq: Dur");
+    midiStrings.add(" Step Seq: Length");
+    midiStrings.add(" Step Seq: Off Value");
+    midiStrings.add(" Step Seq: Curve");
+    midiStrings.add(" Step Seq: Steps");
+}
+
+void StepSequencerComponent::handleCommandMessage (int commandId)
+{
+    //[UserCode_handleCommandMessage] -- Add your code here...
+    switch(commandId){
+        case StepSequencer::valuesUpdated:
+            processor.setStepValues(stepSequencer->getStepValues());
+            processor.setUIState(stepSequencer->toString(), AkatekoAudioProcessor::StepSequencerId);
+            break;
+        case StepSequencer::buttonsUpdated:
+            processor.setButtonStates(stepSequencer->getButtonStates());
+            processor.setUIState(stepSequencer->toString(), AkatekoAudioProcessor::StepSequencerId);
+            break;
+    }
+
+    if(paramIndices.size() == 8 &&
+       midiStrings.size())
+    {
+        int index = -1;
+        int param = -1;
+        int handling = -1 ;
+        double minValue = 0.0;
+        double maxValue = 1.0;
+
+        if(commandId == requestMenuIds[0]){         // Enable
+            index = menu.show();
+            param = 0;
+            handling = akateko::MIDI_TO_INT_TOGGLE;
+        } else if(commandId == requestMenuIds[1]){  // Sync
+            index = menu.show();
+            param = 1;
+            handling = akateko::MIDI_TO_INT_TOGGLE;
+        } else if(commandId == requestMenuIds[2]){  // Chop Curve
+            index = menu.show();
+            param = 2;
+            handling = akateko::MIDI_TO_INT_TOGGLE;
+        } else if(commandId == requestMenuIds[3]){  // Duration
+            index = menu.show();
+            param = 3;
+            handling = akateko::MIDI_TO_DOUBLE;
+
+            if(syncToggle->getToggleState()){
+                maxValue = 17;
+                handling = akateko::MIDI_TO_INT;
+            } else {
+                minValue = 50.0;
+                maxValue = 5000.0;
+                handling = akateko::MIDI_TO_DOUBLE;
+            }
+        } else if(commandId == requestMenuIds[4]){  // Length
+            index = menu.show();
+            param = 4;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuIds[5]){  // Off Value
+            index = menu.show();
+            param = 5;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuIds[6]){  // Curve
+            index = menu.show();
+            param = 6;
+            minValue = 0;
+            maxValue = 1.0;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuIds[7]){  // Steps
+            index = menu.show();
+            param = 7;
+            maxValue = 4;
+            handling = akateko::MIDI_TO_INT;
+        }
+
+        if(index == 1){
+            MidiRow tmpRow;
+
+            initMidiRow(tmpRow, param, 0, 127, minValue, maxValue, paramIndices[param], handling, midiStrings[param], 7);
+            processor.initiateMidiLearn(tmpRow);
+        } else if(index == 0xFF){
+            processor.removeMidiRow(paramIndices[param]);
+
+            String message = midiStrings[param] + String(" cleared");
+            labelRef.setText(message, sendNotificationAsync);
+        }
+    }
+    //[/UserCode_handleCommandMessage]
 }
 //[/MiscUserCode]
 

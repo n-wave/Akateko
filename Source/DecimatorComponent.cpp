@@ -25,6 +25,12 @@
 
 //[MiscUserDefs] You can add your own user definitions and misc code here...
 #include <iostream>
+#include "Akateko.h"
+
+using akateko::updateFxGUI;
+using akateko::MidiRow;
+using akateko::initMidiRow;
+using akateko::IgnoreRightClick;
 /*
     AudioParameterBool *decimatorEnable;
     AudioParameterBool *decimatorReduceEna;
@@ -46,7 +52,7 @@ DecimatorComponent::DecimatorComponent (const String &name, AkatekoAudioProcesso
       labelRef(label)
 {
     //[Constructor_pre] You can add your own custom stuff here..
-    vector<int>paramIndices = p.getParameterIndices(AkatekoAudioProcessor::decimatorId);
+    paramIndices = p.getParameterIndices(AkatekoAudioProcessor::decimatorId);
     StringArray paramIds = p.getParameterIds(AkatekoAudioProcessor::decimatorId);
     const OwnedArray<AudioProcessorParameter> &params = p.getParameters();
 
@@ -54,15 +60,25 @@ DecimatorComponent::DecimatorComponent (const String &name, AkatekoAudioProcesso
        paramIds.size() == 7 &&
        params.size() >= paramIndices[6])
     {
-        addAndMakeVisible(enableToggle = new ParamToggle(paramIds[0], *params.getUnchecked(paramIndices[0]),labelRef));
-        addAndMakeVisible(reduceEnable = new ParamToggle(paramIds[1], *params.getUnchecked(paramIndices[1]), labelRef));
-        addAndMakeVisible(srateEnable = new ParamToggle(paramIds[2], *params.getUnchecked(paramIndices[2]), labelRef));
-        addAndMakeVisible(filterToggle = new ParamToggle(paramIds[3], *params.getUnchecked(paramIndices[3]), labelRef));
+        requestMenuIds[0] = paramIds[0].hash();
+        requestMenuIds[1] = paramIds[1].hash();
+        requestMenuIds[2] = paramIds[2].hash();
+        requestMenuIds[3] = paramIds[3].hash();
+        requestMenuIds[4] = paramIds[4].hash();
+        requestMenuIds[5] = paramIds[5].hash();
+        requestMenuIds[6] = paramIds[6].hash();
 
-        addAndMakeVisible(bitSlider = new Slider(paramIds[4]));
+        initialiseMidiStrings();
+
+        addAndMakeVisible(enableToggle = new ParamImageToggle(paramIds[0], *params.getUnchecked(paramIndices[0]),labelRef));
+        addAndMakeVisible(reduceEnable = new ParamImageToggle(paramIds[1], *params.getUnchecked(paramIndices[1]), labelRef));
+        addAndMakeVisible(srateEnable = new ParamImageToggle(paramIds[2], *params.getUnchecked(paramIndices[2]), labelRef));
+        addAndMakeVisible(filterToggle = new ParamImageToggle(paramIds[3], *params.getUnchecked(paramIndices[3]), labelRef));
+
+        addAndMakeVisible(bitSlider = new IgnoreRightClick<Slider>(paramIds[4]));
         bitReduction = params.getUnchecked(paramIndices[4]);
 
-        addAndMakeVisible(rateSlider = new Slider(paramIds[5]));
+        addAndMakeVisible(rateSlider = new IgnoreRightClick<Slider>(paramIds[5]));
         srateReduction = params.getUnchecked(paramIndices[5]);
 
         addAndMakeVisible(mixSlider = new ParamSlider(paramIds[6], *params.getUnchecked(paramIndices[6]), labelRef));
@@ -70,10 +86,10 @@ DecimatorComponent::DecimatorComponent (const String &name, AkatekoAudioProcesso
         std::cerr << "DecimatorComponent::DecimatorComponent" << std::endl;
         std::cerr << "Parameters not bound properly" << std::endl;
 
-        addAndMakeVisible (enableToggle = new ToggleButton ("enableToggle"));
-        addAndMakeVisible (srateEnable = new ToggleButton ("srateEnable"));
-        addAndMakeVisible (reduceEnable = new ToggleButton ("reduceEnable"));
-        addAndMakeVisible (filterToggle = new ToggleButton ("filterToggle"));
+        addAndMakeVisible (enableToggle = new ImageButton ("enableToggle"));
+        addAndMakeVisible (srateEnable = new ImageButton ("srateEnable"));
+        addAndMakeVisible (reduceEnable = new ImageButton ("reduceEnable"));
+        addAndMakeVisible (filterToggle = new ImageButton ("filterToggle"));
         addAndMakeVisible (rateSlider = new Slider ("rateSlider"));
         addAndMakeVisible (bitSlider = new Slider ("bitSlider"));
         addAndMakeVisible (mixSlider = new Slider ("mixSlider"));
@@ -91,30 +107,48 @@ DecimatorComponent::DecimatorComponent (const String &name, AkatekoAudioProcesso
 
             index++;
         }
-
     }
 
     //[/Constructor_pre]
-    rateSlider->setRange (0.0, 0.99, 0);
+    rateSlider->setRange (0.0, 1.0, 0);
     rateSlider->setSliderStyle (Slider::RotaryHorizontalDrag);
     rateSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
     rateSlider->addListener (this);
 
 
-    bitSlider->setRange (0.0, 0.99, 0);
+    bitSlider->setRange (0.0, 1.0, 0);
     bitSlider->setSliderStyle (Slider::RotaryHorizontalDrag);
     bitSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
     bitSlider->addListener (this);
 
     mixSlider->setRange (0, 1, 0);
     mixSlider->setSliderStyle (Slider::RotaryHorizontalDrag);
+    mixSlider->setDoubleClickReturnValue(true, 0.5);
     mixSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
 
     enableToggle->setButtonText (String());
-    filterToggle->setButtonText (String());
-    reduceEnable->setButtonText (String());
-    srateEnable->setButtonText (String());
+    enableToggle->setImages(false, true, false,
+                            ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour(0x7F000000),
+                            ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour (0x4F20BFCF),
+                            ImageCache::getFromMemory (BinaryData::ToggleOn_png, BinaryData::ToggleOn_pngSize), 1.0f, Colour (0x3F20BFCF));
 
+    filterToggle->setButtonText (String());
+    filterToggle->setImages(false, true, false,
+                            ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour(0x7F000000),
+                            ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour (0x4F20BFCF),
+                            ImageCache::getFromMemory (BinaryData::ToggleOn_png, BinaryData::ToggleOn_pngSize), 1.0f, Colour (0x3F20BFCF));
+
+    reduceEnable->setButtonText(String());
+    reduceEnable->setImages(false, true, false,
+                            ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour(0x7F000000),
+                            ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour (0x4F20BFCF),
+                            ImageCache::getFromMemory (BinaryData::ToggleOn_png, BinaryData::ToggleOn_pngSize), 1.0f, Colour (0x3F20BFCF));
+
+    srateEnable->setButtonText (String());
+    srateEnable->setImages(false, true, false,
+                           ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour(0x7F000000),
+                           ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour (0x4F20BFCF),
+                           ImageCache::getFromMemory (BinaryData::ToggleOn_png, BinaryData::ToggleOn_pngSize), 1.0f, Colour (0x3F20BFCF));
 
     //[UserPreSize]
     //[/UserPreSize]
@@ -123,6 +157,13 @@ DecimatorComponent::DecimatorComponent (const String &name, AkatekoAudioProcesso
 
 
     //[Constructor] You can add your own custom stuff here..
+    claf = new CustomLookAndFeel();
+    blaf = new SliderLookAndFeel(ImageCache::getFromMemory(BinaryData::AkatekoBigV3_png, BinaryData::AkatekoBigV3_pngSize));
+
+    menu.setLookAndFeel(claf);
+    rateSlider->setLookAndFeel(blaf);
+    bitSlider->setLookAndFeel(blaf);
+    mixSlider->setLookAndFeel(blaf);
 
     if(bitReduction != nullptr){
         const double tmpValue = bitReduction->getValue();
@@ -134,6 +175,9 @@ DecimatorComponent::DecimatorComponent (const String &name, AkatekoAudioProcesso
         rateSlider->setValue(tmpValue, dontSendNotification);
     }
 
+    menu.addItem(1, "learn");
+    menu.addSeparator();
+    menu.addItem(0xFF, "clear");
     //[/Constructor]
 }
 
@@ -152,6 +196,8 @@ DecimatorComponent::~DecimatorComponent()
 
 
     //[Destructor]. You can add your own custom destruction code here..
+    claf = nullptr;
+    blaf = nullptr;
     //[/Destructor]
 }
 
@@ -190,11 +236,11 @@ void DecimatorComponent::resized()
 
     rateSlider->setBounds (93, 136, 72, 72);
     bitSlider->setBounds (32, 32, 72, 72);
-    mixSlider->setBounds (152, 32, 72, 72);
-    enableToggle->setBounds (235, -3, 24, 24);
-    filterToggle->setBounds (142, 88, 24, 24);
-    reduceEnable->setBounds (96, 88, 24, 24);
-    srateEnable->setBounds (119, 112, 24, 24);
+    mixSlider->setBounds (154, 32, 72, 72);
+    enableToggle->setBounds (238, 0, 18, 18);
+    filterToggle->setBounds (143, 88, 16, 16);
+    reduceEnable->setBounds (96, 88, 16, 16);
+    srateEnable->setBounds (120, 117, 16, 16);
     //[UserResized] Add your own custom resize handling here..
     //[/UserResized]
 }
@@ -208,7 +254,7 @@ void DecimatorComponent::sliderValueChanged (Slider* sliderThatWasMoved)
     {
         //[UserSliderCode_rateSlider] -- add your slider handling code here..
         const double tmpValue = rateSlider->getValue();
-        const int labelValue = tmpValue*100+1;
+        const int labelValue = tmpValue*100;
 
         String tmpName = rateSlider->getName() +
                          String(labelValue) +
@@ -226,7 +272,7 @@ void DecimatorComponent::sliderValueChanged (Slider* sliderThatWasMoved)
     {
         //[UserSliderCode_bitSlider] -- add your slider handling code here..
         const double tmpValue = bitSlider->getValue();
-        const int labelValue = tmpValue*100+1;
+        const int labelValue = tmpValue*100;
 
         String tmpName = bitSlider->getName() +
                          String(labelValue) +
@@ -248,23 +294,81 @@ void DecimatorComponent::sliderValueChanged (Slider* sliderThatWasMoved)
 
 //[MiscUserCode] You can add your own definitions of your custom methods or any other code here...
 void DecimatorComponent::handleCommandMessage(int commandId){
-    if(commandId == update){
-        enableToggle->postCommandMessage(ParamToggle::update);
-        reduceEnable->postCommandMessage(ParamToggle::update);
-        srateEnable->postCommandMessage(ParamToggle::update);
-        filterToggle->postCommandMessage(ParamToggle::update);
-        mixSlider->postCommandMessage(ParamToggle::update);
+    if(commandId == updateFxGUI){
+        enableToggle->postCommandMessage(ParamImageToggle::update);
+        reduceEnable->postCommandMessage(ParamImageToggle::update);
+        srateEnable->postCommandMessage(ParamImageToggle::update);
+        filterToggle->postCommandMessage(ParamImageToggle::update);
+        mixSlider->postCommandMessage(ParamSlider::update);
 
         if(bitReduction != nullptr){
             const double tmpValue = bitReduction->getValue();
-            bitSlider->setValue(tmpValue, dontSendNotification);
+            bitSlider->setValue(tmpValue, sendNotificationAsync);
         }
 
         if(srateReduction != nullptr){
             const double tmpValue = srateReduction->getValue();
-            rateSlider->setValue(tmpValue, dontSendNotification);
+            rateSlider->setValue(tmpValue, sendNotificationAsync);
         }
     }
+
+    else if(paramIndices.size() == 7 &&
+            midiStrings.size() ==  7)
+    {
+        int index = -1;;
+        int param = -1;
+        int handling = -1;
+
+        if(commandId == requestMenuIds[0]){         // Enable
+            index = menu.show();
+            param = 0;
+            handling = akateko::MIDI_TO_INT_TOGGLE;
+        } else if(commandId == requestMenuIds[1]){  // BIT Reduction Enable
+            index = menu.show();
+            param = 1;
+            handling = akateko::MIDI_TO_INT_TOGGLE;
+        } else if(commandId == requestMenuIds[2]){  // SR Reduction Enable
+            index = menu.show();
+            param = 2;
+            handling = akateko::MIDI_TO_INT_TOGGLE;
+        } else if(commandId == requestMenuIds[3]){  // Filter Enabled
+            index = menu.show();
+            param = 3;
+            handling = akateko::MIDI_TO_INT_TOGGLE;
+        } else if(commandId == requestMenuIds[4]){  // Bit reduction
+            index = menu.show();
+            param = 4;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuIds[5]){  // Srate Reduction
+            index = menu.show();
+            param = 5;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuIds[6]){  // Mix
+            index = menu.show();
+            param = 6;
+            handling = akateko::MIDI_TO_DOUBLE;
+        }
+
+        if(index == 1){
+            MidiRow tmpRow;
+            initMidiRow(tmpRow, param, 0, 127, 0.0, 1.0, paramIndices[param], handling, midiStrings[param], 16);
+            processor.initiateMidiLearn(tmpRow);
+        } else if(index == 0xFF){
+            processor.removeMidiRow(paramIndices[param]);
+        }
+    }
+}
+
+void DecimatorComponent::initialiseMidiStrings(){
+    midiStrings.clear();
+
+    midiStrings.add(" Decimator: Enable");
+    midiStrings.add(" Decimator: Red En");
+    midiStrings.add(" Decimator: SR En");
+    midiStrings.add(" Decimator: Filter");
+    midiStrings.add(" Decimator: Reduce");
+    midiStrings.add(" Decimator: SRate");
+    midiStrings.add(" Decimator: Mix");
 }
 //[/MiscUserCode]
 
@@ -306,18 +410,18 @@ BEGIN_JUCER_METADATA
           max="1" int="0" style="RotaryHorizontalDrag" textBoxPos="NoTextBox"
           textBoxEditable="0" textBoxWidth="80" textBoxHeight="20" skewFactor="1"
           needsCallback="0"/>
-  <TOGGLEBUTTON name="enableToggle" id="88f90ae5f3542048" memberName="enableToggle"
-                virtualName="" explicitFocusOrder="0" pos="235 -3 24 24" buttonText=""
-                connectedEdges="0" needsCallback="0" radioGroupId="0" state="0"/>
-  <TOGGLEBUTTON name="filterToggle" id="44e2075e9f6d8a26" memberName="filterToggle"
-                virtualName="" explicitFocusOrder="0" pos="142 88 24 24" buttonText=""
-                connectedEdges="0" needsCallback="0" radioGroupId="0" state="0"/>
-  <TOGGLEBUTTON name="reduceEnable" id="cae87162d6a88cf9" memberName="reduceEnable"
-                virtualName="" explicitFocusOrder="0" pos="96 88 24 24" buttonText=""
-                connectedEdges="0" needsCallback="0" radioGroupId="0" state="0"/>
-  <TOGGLEBUTTON name="srateEnable" id="510b26acf7761569" memberName="srateEnable"
-                virtualName="" explicitFocusOrder="0" pos="119 112 24 24" buttonText=""
-                connectedEdges="0" needsCallback="0" radioGroupId="0" state="0"/>
+  <IMAGEBUTTON name="enableToggle" id="88f90ae5f3542048" memberName="enableToggle"
+               virtualName="" explicitFocusOrder="0" pos="235 -3 24 24" buttonText=""
+               connectedEdges="0" needsCallback="0" radioGroupId="0" state="0"/>
+  <IMAGEBUTTON name="filterToggle" id="44e2075e9f6d8a26" memberName="filterToggle"
+               virtualName="" explicitFocusOrder="0" pos="142 88 24 24" buttonText=""
+               connectedEdges="0" needsCallback="0" radioGroupId="0" state="0"/>
+  <IMAGEBUTTON name="reduceEnable" id="cae87162d6a88cf9" memberName="reduceEnable"
+               virtualName="" explicitFocusOrder="0" pos="96 88 24 24" buttonText=""
+               connectedEdges="0" needsCallback="0" radioGroupId="0" state="0"/>
+  <IMAGEBUTTON name="srateEnable" id="510b26acf7761569" memberName="srateEnable"
+               virtualName="" explicitFocusOrder="0" pos="119 112 24 24" buttonText=""
+               connectedEdges="0" needsCallback="0" radioGroupId="0" state="0"/>
 </JUCER_COMPONENT>
 
 END_JUCER_METADATA

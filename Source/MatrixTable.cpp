@@ -27,7 +27,8 @@ MatrixTable::MatrixTable(ModulationMatrix &modm) :
     cellHeight(0.f),
     fxOneStartIndex(22),
     fxTwoStartIndex(23),
-    textColour(Colours::lightgrey)
+    textColour(Colour(0xFF4A997A)),
+    outlineColour(Colour(0xFF70C099))
 {   
     rowIsActive.resize(numRows, false);
 
@@ -62,6 +63,7 @@ MatrixTable::MatrixTable(ModulationMatrix &modm) :
     sources.add("SSEQ");
     sources.add("PAD X");
     sources.add("PAD Y");
+    sources.add("PAD T");
 
     transform.add("unipolar");
     transform.add("bipolar");
@@ -164,16 +166,6 @@ MatrixTable::~MatrixTable()
     }
 }
 
-/*
- *        tmpRow.source = -1; // -1 Not set ignore
-        tmpRow.transform = -1;
-        tmpRow.intensity = 1.0;
-        tmpRow.range = 1.0;
-        tmpRow.destination = -1; // -1 Not set ignore
-        tmpRow.on = 0; //On off
- *
- */
-
 void MatrixTable::updateGui(){
     for(int i= 0; i<numRows; i++){
         rows[i].source = -1;
@@ -215,8 +207,8 @@ MatrixRow MatrixTable::getMatrixRow(int id){
 }
 
 void MatrixTable::initialiseHeader(float width, float height){
-    cellWidth = width*0.1925;
-    float widthTwo = width*0.05;
+    cellWidth = width*0.1923;
+    float widthTwo = width*0.04;
     cellHeight = height*0.085;
 
     getHeader().addColumn("Source", 1, cellWidth , cellWidth, -1, TableHeaderComponent::visible, -1);
@@ -229,6 +221,7 @@ void MatrixTable::initialiseHeader(float width, float height){
     numColumn = getHeader().getNumColumns(false);
     getHeader().setStretchToFitActive(false);
     getHeader().setPopupMenuActive(false);
+    getHeader().setLookAndFeel(&laf);
 
     /* set View property's before it is added */
 
@@ -246,7 +239,7 @@ void MatrixTable::paintOverChildren(Graphics &g){
     int tmpHeight = getHeight();
 
 
-    g.setColour(Colours::white.withAlpha(0.5f));
+    g.setColour(outlineColour);
 
     g.drawRect(0 , 0, tmpWidth, tmpHeight, 1.0);
 
@@ -267,12 +260,12 @@ void MatrixTable::paintRowBackground(Graphics &g,
         Colour colour = findColour(TableListBox::backgroundColourId);
 
         if(rowIsSelected){
-            g.setColour(Colours::darkgrey);
+            g.setColour(Colours::white);
         }
 
         g.fillAll( colour );
         // draw the cell bottom divider beween rows
-        g.setColour( Colours::white);
+        g.setColour(outlineColour);
         g.drawLine( 0, height, width, height );
    }
 }
@@ -287,14 +280,6 @@ void MatrixTable::paintCell(Graphics &g,
 {
     Colour colour = findColour(TableListBox::backgroundColourId);
 
-
-    if(activeRow == rowNumber &&
-         activeColumn == columnId)
-    {
-        g.setColour(Colours::lightgrey.withAlpha(0.25f));
-        g.fillRect(0,0,width, height);
-    }
-
     if(rowNumber < numRows){
         g.setColour(textColour);
         g.setFont(15.f);
@@ -308,7 +293,8 @@ void MatrixTable::paintCell(Graphics &g,
             } else if(columnId == 2 && ti < transform.size()){
 
                 if(ti == TRANSFORM::NONE){
-                    if(si >= MODSRC::ENV1 && si <= MODSRC::SSEQ){
+                    if(si >= MODSRC::ENV1 && si <= MODSRC::SSEQ ||
+                       si >= MODSRC::PADX && si <= MODSRC::PADT){
                         ti =0;
                     } else if(si >= MODSRC::LFO1 && si <= MODSRC::LFO2){
                         ti = 1;
@@ -320,8 +306,6 @@ void MatrixTable::paintCell(Graphics &g,
 
         if(rows[rowNumber].destination != -1 && columnId == 5){
             int di = rows[rowNumber].destination;
-
-
 
             g.drawText(destination[di], 0, 0, width, height, Justification::centred);
         }
@@ -339,8 +323,6 @@ void MatrixTable::paintCell(Graphics &g,
             }
         }
 
-     //   g.setColour( Colours::white);
-     //   g.drawLine( width, 0, width, height );
     }
 }
 
@@ -367,13 +349,12 @@ void MatrixTable::cellClicked(int rowNumber,
             {
                 rows[rowNumber].on = !(rows[rowNumber].on);
                 modMatrix.setEnabled(rows[rowNumber].on, activeRow);
-            }
+            }         
         }
     }
 
     updateContent();
-    this->repaint();
-
+    repaint();
 }
 
 Component* MatrixTable::refreshComponentForCell(int rowNumber,
@@ -408,8 +389,29 @@ Component* MatrixTable::refreshComponentForCell(int rowNumber,
                     if(rows[rowNumber].destination != -1){
                         numberBox->setColour(Label::textColourId, textColour); // change at later point
                     }
-                    numberBox->setMaxValue(1.0);
-                    numberBox->setMinValue(0.0);
+
+                    // Set range based on destination
+                    const int dest = rows[rowNumber].destination;
+
+                   // std::cout << "Printing out Destintion" << dest << std::endl;
+
+                    if(dest == SDLDEL || dest == SDRDEL || dest == PPLDEL || dest == PPRDEL ||
+                       dest == LCRLDEL || dest == LCRCDEL || dest == LCRRDEL)
+                    {
+                        numberBox->setInterval(2.5);
+                        numberBox->setMaxValue(500.0);
+                        numberBox->setMinValue(0.0);
+                    } else {
+                        const float tmpValue = numberBox->getValue();
+
+                        if(tmpValue > 1.0){
+                            numberBox->setValue(1.0);
+                        }
+
+                        numberBox->setInterval(0.05);
+                        numberBox->setMaxValue(1.0);
+                        numberBox->setMinValue(0.0);
+                    }
                 }
 
                 numberBox->setColour(Label::backgroundColourId, Colour(0x00000000));
@@ -464,12 +466,31 @@ Component* MatrixTable::refreshComponentForCell(int rowNumber,
                         if(rows[rowNumber].destination != -1){
                             numberBox->setColour(Label::textColourId, textColour); // change at later point
                         }
-                        numberBox->setMaxValue(1.0);
-                        numberBox->setMinValue(0.0);
+
+
+                        const int dest = rows[rowNumber].destination;
+
+                        if(dest == SDLDEL || dest == SDRDEL || dest == PPLDEL || dest == PPRDEL ||
+                           dest == LCRLDEL || dest == LCRCDEL || dest == LCRRDEL)
+                        {
+                            numberBox->setInterval(2.5);
+                            numberBox->setMaxValue(500.0);
+                            numberBox->setMinValue(0.0);
+                        } else {
+                            const float tmpValue = numberBox->getValue();
+
+                            if(tmpValue > 1.0){
+                                numberBox->setValue(1.0);     
+                            }
+
+                            numberBox->setInterval(0.05);
+                            numberBox->setMaxValue(1.0);
+                            numberBox->setMinValue(0.0);
+                        }
                     }
 
                     numberBox->setColour(Label::backgroundColourId, Colour(0x00000000));
-                    numberBox->setColour(Label::textColourId, Colours::whitesmoke); // change at later point
+                    numberBox->setColour(Label::textColourId, textColour); // change at later point
                     numberBox->setJustificationType(Justification::centred);
                 } else {
                     /* Row Number and identity's are correct proceed on setting the values */
@@ -488,6 +509,28 @@ Component* MatrixTable::refreshComponentForCell(int rowNumber,
 
                         if(rows[rowNumber].destination != -1){
                             numberBox->setColour(Label::textColourId, textColour); // change at later point
+                        }
+
+
+                        const int dest = rows[rowNumber].destination;
+
+                        if(dest == SDLDEL || dest == SDRDEL || dest == PPLDEL || dest == PPRDEL ||
+                           dest == LCRLDEL || dest == LCRCDEL || dest == LCRRDEL)
+                        {
+                            numberBox->setInterval(2.5);
+                            numberBox->setMaxValue(500.0);
+                            numberBox->setMinValue(0.0);
+                        } else {
+                            const float tmpValue = numberBox->getValue();
+
+                            if(tmpValue > 1.0){
+                                numberBox->setValue(1.0);
+
+                            }
+
+                            numberBox->setInterval(0.05);
+                            numberBox->setMaxValue(1.0);
+                            numberBox->setMinValue(0.0);
                         }
                     }
                 }
@@ -612,6 +655,7 @@ bool MatrixTable::getEnabled(int id){
 
 void MatrixTable::sourceMenu(int rowNumber){
     menu = new PopupMenu();
+    menu->setLookAndFeel(&laf);
 
     menu->addItem(1, "LFO One", true, false, nullptr);
     menu->addItem(2, "LFO Two", true, false, nullptr);
@@ -621,6 +665,7 @@ void MatrixTable::sourceMenu(int rowNumber){
     menu->addSeparator();
     menu->addItem(6, "PAD X", true, false, nullptr);
     menu->addItem(7, "PAD Y", true, false, nullptr);
+    menu->addItem(8, "Pad T", true, false, nullptr);
 
     menu->addSeparator();
     menu->addItem(0xFF, "clear", true, false, nullptr);
@@ -680,19 +725,20 @@ void MatrixTable::transformMenu(int rowNumber){
          */
 
         menu = new PopupMenu();
+        menu->setLookAndFeel(&laf);
 
         for(int i=0; i<transform.size(); i++){
             menu->addItem(i+1, transform[i], true, false, nullptr);          
         }
 
         int index = menu->show() -1;
-        std::cout << "transform index : " << index << std::endl;
+       // std::cout << "transform index : " << index << std::endl;
 
         if(index >= 0 && index <= 1){
             int source  = rows[rowNumber].source;
             int transform = index;
 
-            std::cout << "printing source : " << source << std::endl;
+            //std::cout << "printing source : " << source << std::endl;
             /* Better to check everything in the gui implmentation
              * than in the ModulationMatrix update function
              * in the process loop
@@ -704,6 +750,8 @@ void MatrixTable::transformMenu(int rowNumber){
             else if(source >= MODSRC::ENV1 && source <= MODSRC::SSEQ && index == 0){
                 transform = TRANSFORM::NONE;
             }
+
+
 
             rows[rowNumber].transform = transform;
 
@@ -718,6 +766,7 @@ void MatrixTable::transformMenu(int rowNumber){
 
 void MatrixTable::destinationMenu(int rowNumber){    
     menu = new PopupMenu();
+    menu->setLookAndFeel(&laf);
 
     menu->addSubMenu("Filter One", filterOneMenu);
     menu->addSubMenu("Filter Two", filterTwoMenu);
@@ -810,6 +859,18 @@ void MatrixTable::initialiseSubMenus(){
     // FX Menus
     effectOneMenu.addItem(-1, "None", true, false, nullptr);
     effectTwoMenu.addItem(-1, "None", true, false, nullptr);
+
+
+    // Set All look and Feel Methods
+    filterOneMenu.setLookAndFeel(&laf);
+    filterTwoMenu.setLookAndFeel(&laf);
+    waveshaperMenu.setLookAndFeel(&laf);
+    lfoOne.setLookAndFeel(&laf);
+    lfoTwo.setLookAndFeel(&laf);
+    envOne.setLookAndFeel(&laf);
+    sseq.setLookAndFeel(&laf);
+    effectOneMenu.setLookAndFeel(&laf);
+    effectTwoMenu.setLookAndFeel(&laf);
 }
 
 void MatrixTable::setEffectsDestination(int fxProcessor, int effect){

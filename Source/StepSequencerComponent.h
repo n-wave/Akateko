@@ -26,6 +26,7 @@
 #include "/work/programming-projects/msm/msm-gui/ParamSlider.h"
 #include "/work/programming-projects/msm/msm-gui/ParamToggle.h"
 #include "/work/programming-projects/msm/msm-gui/ParamComboBox.h"
+#include "CustomLookAndFeel.h"
 #include "PluginProcessor.h"
 
 #include <vector>
@@ -60,6 +61,7 @@ public:
     void setUIState(String state);
 
     void updateGui();
+    void setLookAndFeel(LookAndFeel *laf);
     //[/UserMethods]
 
     void paint (Graphics& g) override;
@@ -74,12 +76,20 @@ private:
     void initialiseBeatDivision();
     void initDurationSlider(); //Call when Envelope has been set
     int findClosestTimeDivision(double period);
+    int getTimeDivisionIndex(std::vector<double> values,double period);
+    void initialiseMidiStrings();
 
     StringArray beatDivision;
     std::vector<double> valueBeatDivision;
+    std::vector<int> paramIndices;
+    int requestMenuIds[8];
+    StringArray midiStrings;
 
     int stepAmount;
     double curveMidPoint;
+    double beatsPerMinute;
+
+    PopupMenu menu;
 
     AudioProcessorParameter *duration;
     AkatekoAudioProcessor &processor;
@@ -97,7 +107,6 @@ private:
     ScopedPointer<Slider> offsetSlider;
     ScopedPointer<Slider> exponentSlider;
     ScopedPointer<ToggleButton> chopperToggle;
-    ScopedPointer<TextButton> textButton;
 
 
     //==============================================================================

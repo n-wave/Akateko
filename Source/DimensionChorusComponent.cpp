@@ -25,6 +25,12 @@
 
 //[MiscUserDefs] You can add your own user definitions and misc code here...
 #include <iostream>
+#include "Akateko.h"
+
+using akateko::updateFxGUI;
+using akateko::IgnoreRightClick;
+using akateko::MidiRow;
+using akateko::initMidiRow;
 //[/MiscUserDefs]
 
 //==============================================================================
@@ -34,7 +40,7 @@ DimensionChorusComponent::DimensionChorusComponent (const String &name, AkatekoA
       labelRef(label)
 {
     //[Constructor_pre] You can add your own custom stuff here..
-    vector<int>paramIndices = p.getParameterIndices(AkatekoAudioProcessor::DChorusId);
+    paramIndices = p.getParameterIndices(AkatekoAudioProcessor::DChorusId);
     StringArray paramIds = p.getParameterIds(AkatekoAudioProcessor::DChorusId);
     const OwnedArray<AudioProcessorParameter> &params = p.getParameters();
 
@@ -42,14 +48,25 @@ DimensionChorusComponent::DimensionChorusComponent (const String &name, AkatekoA
        paramIds.size() == 9 &&
        params.size() >= paramIndices[8])
     {
+        requestMenuIds[0] = paramIds[0].hash();
+        requestMenuIds[1] = paramIds[1].hash();
+        requestMenuIds[2] = paramIds[2].hash();
+        requestMenuIds[3] = paramIds[3].hash();
+        requestMenuIds[4] = paramIds[4].hash();
+        requestMenuIds[5] = paramIds[5].hash();
+        requestMenuIds[6] = paramIds[6].hash();
+        requestMenuIds[7] = paramIds[7].hash();
+        requestMenuIds[8] = paramIds[8].hash();
 
-        addAndMakeVisible(enableToggle = new ParamToggle(paramIds[0], *params.getUnchecked(paramIndices[0]), label));
+        initialiseMidiStrings();
+
+        addAndMakeVisible(enableToggle = new ParamImageToggle(paramIds[0], *params.getUnchecked(paramIndices[0]), label));
         addAndMakeVisible (rateSlider = new ParamSlider(paramIds[1], *params.getUnchecked(paramIndices[1]), label, 0.02, 5));
 
         addAndMakeVisible (spreadSlider = new ParamSlider(paramIds[2], *params.getUnchecked(paramIndices[2]), label));
         addAndMakeVisible (depthSlider = new ParamSlider(paramIds[3], *params.getUnchecked(paramIndices[3]), label));
 
-        addAndMakeVisible (waveSlider = new Slider (paramIds[4]));
+        addAndMakeVisible (waveSlider = new IgnoreRightClick<Slider> (paramIds[4]));
         wave = params.getUnchecked(paramIndices[4]);
 
         addAndMakeVisible (frequencySlider = new ParamSlider(paramIds[5], *params.getUnchecked(paramIndices[5]), label, 20.f, 20000.f));
@@ -58,7 +75,7 @@ DimensionChorusComponent::DimensionChorusComponent (const String &name, AkatekoA
         addAndMakeVisible (mixSlider = new ParamSlider(paramIds[8], *params.getUnchecked(paramIndices[8]), label));
 
     } else {
-        addAndMakeVisible (enableToggle = new ToggleButton ("enableToggle"));
+        addAndMakeVisible (enableToggle = new ImageButton ("enableToggle"));
         addAndMakeVisible (rateSlider = new Slider ("rateSlider"));
         addAndMakeVisible (spreadSlider = new Slider ("spreadSlider"));
         addAndMakeVisible (depthSlider = new Slider ("dephSlider"));
@@ -90,10 +107,10 @@ DimensionChorusComponent::DimensionChorusComponent (const String &name, AkatekoA
     }
 
     //[/Constructor_pre]
-
     rateSlider->setRange (0, 1, 0);
     rateSlider->setSliderStyle (Slider::RotaryHorizontalDrag);
     rateSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
+
 
     depthSlider->setRange (0, 1, 0);
     depthSlider->setSliderStyle (Slider::RotaryHorizontalDrag);
@@ -108,23 +125,33 @@ DimensionChorusComponent::DimensionChorusComponent (const String &name, AkatekoA
     centerAmpSlider->setSliderStyle (Slider::RotaryHorizontalDrag);
     centerAmpSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
 
+
     mixSlider->setRange (0, 1, 0);
     mixSlider->setSliderStyle (Slider::RotaryHorizontalDrag);
     mixSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
+    mixSlider->setDoubleClickReturnValue(true, 0.5f);
+
 
     centerPanSlider->setRange (0, 1, 0);
     centerPanSlider->setSliderStyle (Slider::RotaryHorizontalDrag);
     centerPanSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
+    centerPanSlider->setDoubleClickReturnValue(true, 0.5f);
 
     frequencySlider->setRange (0, 1, 0);
     frequencySlider->setSliderStyle (Slider::RotaryHorizontalDrag);
     frequencySlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
 
-    waveSlider->setRange (0, 1, 0.5);
+    waveSlider->setRange (0, 2, 1);
     waveSlider->setSliderStyle (Slider::RotaryHorizontalDrag);
     waveSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
     waveSlider->setMouseDragSensitivity(60);
+
     waveSlider->addListener (this);
+
+    enableToggle->setImages(false, true, false,
+                            ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour(0x7F000000),
+                            ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour (0x4F20BFCF),
+                            ImageCache::getFromMemory (BinaryData::ToggleOn_png, BinaryData::ToggleOn_pngSize), 1.0f, Colour (0x3F20BFCF));
 
     //[UserPreSize]
 
@@ -134,10 +161,30 @@ DimensionChorusComponent::DimensionChorusComponent (const String &name, AkatekoA
 
 
     //[Constructor] You can add your own custom stuff here..
+
+    blaf = new SliderLookAndFeel(ImageCache::getFromMemory(BinaryData::AkatekoBigV3_png, BinaryData::AkatekoBigV3_pngSize));
+    pblaf = new SliderLookAndFeel(ImageCache::getFromMemory (BinaryData::PanBig_png, BinaryData::PanBig_pngSize));
+    w2laf = new SliderLookAndFeel(ImageCache::getFromMemory(BinaryData::WaveStripV2_png, BinaryData::WaveStripV2_pngSize));
+    claf = new CustomLookAndFeel();
+
+    rateSlider->setLookAndFeel(blaf);
+    depthSlider->setLookAndFeel(blaf);
+    spreadSlider->setLookAndFeel(blaf);
+    mixSlider->setLookAndFeel(blaf);
+    centerPanSlider->setLookAndFeel(pblaf);
+    frequencySlider->setLookAndFeel(blaf);
+    waveSlider->setLookAndFeel(w2laf);
+    centerAmpSlider->setLookAndFeel(blaf);
+    menu.setLookAndFeel(claf);
+
     if(wave != nullptr){
         const double tmpValue = wave->getValue();
         waveSlider->setValue(tmpValue, dontSendNotification);
     }
+
+    menu.addItem(1, "learn");
+    menu.addSeparator();
+    menu.addItem(0xFF, "clear");
     //[/Constructor]
 }
 
@@ -158,6 +205,10 @@ DimensionChorusComponent::~DimensionChorusComponent()
 
 
     //[Destructor]. You can add your own custom destruction code here..
+    blaf = nullptr;
+    pblaf = nullptr;
+    w2laf = nullptr;
+    claf = nullptr;
     //[/Destructor]
 }
 
@@ -231,8 +282,8 @@ void DimensionChorusComponent::resized()
     mixSlider->setBounds (176, 48, 54, 54);
     centerPanSlider->setBounds (104, 160, 54, 54);
     frequencySlider->setBounds (104, 24, 54, 54);
-    waveSlider->setBounds (24, 92, 54, 54);
-    enableToggle->setBounds (235, -3, 24, 24);
+    waveSlider->setBounds (28, 97, 44, 44);
+    enableToggle->setBounds (238, 0, 18, 18);
     //[UserResized] Add your own custom resize handling here..
     //[/UserResized]
 }
@@ -251,21 +302,18 @@ void DimensionChorusComponent::sliderValueChanged (Slider* sliderThatWasMoved)
     {
         //[UserSliderCode_waveSlider] -- add your slider handling code here..
         String tmpName = waveSlider->getName();
-        int waveSelection = waveSlider->getValue()*2;
+        int waveSelection = waveSlider->getValue();
         int tmpValue = 0;
 
         switch(waveSelection){
             case 0:
                 tmpName += String("Sine");
-                tmpValue = QuadratureOscillator::SINE;
                 break;
             case 1:
                 tmpName += String("Triangle");
-                tmpValue = QuadratureOscillator::TRIANGLE;
                 break;
             case 2:
                 tmpName += String("Cosine");
-                tmpValue = QuadratureOscillator::COSINE;
                 break;
         }
 
@@ -283,8 +331,8 @@ void DimensionChorusComponent::sliderValueChanged (Slider* sliderThatWasMoved)
 
 //[MiscUserCode] You can add your own definitions of your custom methods or any other code here...
 void DimensionChorusComponent::handleCommandMessage(int commandId){
-    if(commandId == update){
-        enableToggle->postCommandMessage(ParamToggle::update);
+    if(commandId == updateFxGUI){
+        enableToggle->postCommandMessage(ParamImageToggle::update);
         rateSlider->postCommandMessage(ParamSlider::update);
         spreadSlider->postCommandMessage(ParamSlider::update);
         depthSlider->postCommandMessage(ParamSlider::update);
@@ -295,10 +343,83 @@ void DimensionChorusComponent::handleCommandMessage(int commandId){
 
         if(wave != nullptr){
             const double tmpValue = wave->getValue();
-            waveSlider->setValue(tmpValue, dontSendNotification);
+            waveSlider->setValue(tmpValue, sendNotificationAsync);
+        }
+    }
+
+    if(paramIndices.size() == 9 &&
+       midiStrings.size() == 9)
+    {
+        int index = -1;
+        int param = -1;
+        int handling = -1;
+        double minValue = 0.0;
+        double maxValue = 1.0;
+
+        if(commandId == requestMenuIds[0]){         // Enable
+            index = menu.show();
+            param = 0;
+            handling = akateko::MIDI_TO_INT_TOGGLE;
+        } else if(commandId == requestMenuIds[1]){  // Rate
+            index = menu.show();
+            param = 1;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuIds[2]){  // Spread
+            index = menu.show();
+            param = 2;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuIds[3]){  // Depth
+            index = menu.show();
+            param = 3;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuIds[4]){  // Wave
+            index = menu.show();
+            param = 4;
+            maxValue = 2;
+            handling = akateko::MIDI_TO_INT;
+        } else if(commandId == requestMenuIds[5]){  // HPF Frequency
+            index = menu.show();
+            param = 5;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuIds[6]){  // Center Amp
+            index = menu.show();
+            param = 6;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuIds[7]){  // Center Pan
+            index = menu.show();
+            param = 7;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuIds[8]){  // Mix
+            index = menu.show();
+            param = 8;
+            handling = akateko::MIDI_TO_DOUBLE;
+        }
+
+        if(index == 1){
+            MidiRow tmpRow;
+            initMidiRow(tmpRow, param, 0, 127, minValue, maxValue, paramIndices[param], handling, midiStrings[param], 14);
+            processor.initiateMidiLearn(tmpRow);
+        } else if(index == 0xFF){
+            processor.removeMidiRow(paramIndices[param]);
         }
     }
 }
+
+void DimensionChorusComponent::initialiseMidiStrings()
+{
+    midiStrings.clear();
+
+    midiStrings.add(" D-Chorus: Enable");
+    midiStrings.add(" D-Chorus: Rate");
+    midiStrings.add(" D-Chorus: Spread");
+    midiStrings.add(" D-Chorus: Depth");
+    midiStrings.add(" D-Chorus: Wave");
+    midiStrings.add(" D-Chorus: HPF Freq");
+    midiStrings.add(" D-Chorus: C-Amp");
+    midiStrings.add(" D-Chorus: C-Pan");
+    midiStrings.add(" D-Chorus: Mix");
+}
+
 //[/MiscUserCode]
 
 
@@ -374,9 +495,9 @@ BEGIN_JUCER_METADATA
           max="1" int="0" style="RotaryHorizontalDrag" textBoxPos="NoTextBox"
           textBoxEditable="0" textBoxWidth="80" textBoxHeight="20" skewFactor="1"
           needsCallback="1"/>
-  <TOGGLEBUTTON name="enableToggle" id="88f90ae5f3542048" memberName="enableToggle"
-                virtualName="" explicitFocusOrder="0" pos="235 -3 24 24" buttonText=""
-                connectedEdges="0" needsCallback="0" radioGroupId="0" state="0"/>
+  <IMAGEBUTTON name="enableToggle" id="88f90ae5f3542048" memberName="enableToggle"
+               virtualName="" explicitFocusOrder="0" pos="235 -3 24 24" buttonText=""
+               connectedEdges="0" needsCallback="0" radioGroupId="0" state="0"/>
 </JUCER_COMPONENT>
 
 END_JUCER_METADATA

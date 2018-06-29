@@ -24,8 +24,10 @@
 #include "../JuceLibraryCode/JuceHeader.h"
 #include "/work/programming-projects/msm/msm-dsp/Common/BeatDivisor.h"
 #include "/work/programming-projects/msm/msm-gui/ParamSlider.h"
-#include "/work/programming-projects/msm/msm-gui/ParamToggle.h"
+#include "/work/programming-projects/msm/msm-gui/ParamImageToggle.h"
 #include "/work/programming-projects/msm/msm-dsp/Generators/QuadratureOscillator.h"
+#include "CustomLookAndFeel.h"
+#include "SliderLookAndFeel.h"
 #include "PluginProcessor.h"
 #include <vector>
 //[/Headers]
@@ -51,15 +53,11 @@ public:
 
     //==============================================================================
     //[UserMethods]     -- You can add your own custom methods in this section.
-    enum commandIds{
-        update
-    };
 
     void handleCommandMessage(int commandId) override;
-    void setBeatDivisionStrings(StringArray beatDivStr);
-    void setBeatDivisionvalues(std::vector<double> beatDivVal);
 
     void updateGui();
+    void calculateBeatDivision(double bpm);
     //[/UserMethods]
 
     void paint (Graphics& g) override;
@@ -72,9 +70,15 @@ public:
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
     void resetShapeButtonColour(int ShapeButton);
-    int findClosestTimeDivision(double freq);
-    void initRateSlider();
 
+    void initRateSlider();
+    void initialiseMidiStrings();
+
+    void initialiseTimeDivisions();
+    int findClosestTimeDivision(double freq);
+    int getTimeDivisionIndex(vector<double> &values, double freq);
+
+    double beatsPerMinute;
 
     AkatekoAudioProcessor &processor;
     Label &labelRef;
@@ -84,19 +88,28 @@ private:
     AudioProcessorParameter *rate;
     AudioProcessorParameter *phase;
 
-    BeatDivisor beatDivisor;
     StringArray beatDivision;
     std::vector<double> valueBeatDivision;
+
+    std::vector<int> paramIndices;
+    int requestMenuIds[8];
+    StringArray midiStrings;
+    PopupMenu menu;
+
+    ScopedPointer<CustomLookAndFeel> claf;
+    ScopedPointer<SliderLookAndFeel> blaf;
+    ScopedPointer<SliderLookAndFeel> wlaf;
+    ScopedPointer<SliderLookAndFeel> fblaf;
     //[/UserVariables]
 
     //==============================================================================
     ScopedPointer<Slider> feedBackSlider;
-    ScopedPointer<ToggleButton> SyncToggle;
+    ScopedPointer<ImageButton> SyncToggle;
     ScopedPointer<Slider> phaseSlider;
     ScopedPointer<Slider> depthSlider;
     ScopedPointer<Slider> rateSlider;
-    ScopedPointer<ToggleButton> crossFB;
-    ScopedPointer<ToggleButton> enableToggle;
+    ScopedPointer<ImageButton> crossFB;
+    ScopedPointer<ImageButton> enableToggle;
     ScopedPointer<Slider> waveSlider;
 
 

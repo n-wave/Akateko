@@ -28,9 +28,13 @@
 #include "/work/programming-projects/msm/msm-gui/ParamComboBox.h"
 #include "/work/programming-projects/msm/msm-gui/EnvelopeDrawing.h"
 
+#include "CustomLookAndFeel.h"
 #include "PluginProcessor.h"
 
 #include <vector>
+#include "Akateko.h"
+
+
 //[/Headers]
 
 
@@ -57,22 +61,20 @@ public:
     //[UserMethods]     -- You can add your own custom methods in this section.
 
     void handleCommandMessage(int commandId) override;
+    void calculateTimeDivision(double bpm);
 
     bool getLoopPoints(float &startPos, float &endPos);
     bool getSustainPoints(float &startPos, float &endPos);
     void getEndPoints(float &startPos, float &endPos);
     void setBPM(double bpm);
 
-    void setBeatDivisionStrings(StringArray beatDivStr);
-    void setBeatDivisionValues(std::vector<double> beatDivVal);
-
-    void initDurationSlider();
-
     void setUIState(String state);
     String getUIState();
     msmBuffer getBuffer();
 
     void updateGui();
+
+    void setLookAndFeel(LookAndFeel *laf);
     //[/UserMethods]
 
     void paint (Graphics& g) override;
@@ -81,16 +83,16 @@ public:
     void buttonClicked (Button* buttonThatWasClicked) override;
     void comboBoxChanged (ComboBox* comboBoxThatHasChanged) override;
 
-
-
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
+    void initialiseTimeDivisions();
+    void initDurationSlider();
     int findClosestTimeDivision(double period);
-
     /* temporary commands, phase out when testing is completed */
     void updateEnvelope(int env);
     void updateLoop(int env);
     void updateSustain(int env);
+    void initialiseMIDIStrings();
 
     int commandTrigger;
     int commandRelease;
@@ -98,10 +100,18 @@ private:
     int envNumber;
     /* Envelope Drawing has been updated */
 
-    double BPM;
+    double beatsPerMinute;
 
     StringArray beatDivision;
     std::vector<double> valueBeatDivision;
+
+    // MIDI
+    std::vector<int> paramIndices;
+    int requestMenuIds[5]; //All Params excelt Trigger Source and Trigger
+    StringArray envOneMIDI;
+    StringArray envTwoMIDI;
+
+    PopupMenu menu;
 
     AudioProcessorParameter *duration;
     AkatekoAudioProcessor &processor;
@@ -112,10 +122,8 @@ private:
     ScopedPointer<EnvelopeDrawing> envelopeDrawing;
     ScopedPointer<Slider> durationSlider;
     ScopedPointer<Slider> envLoopSlider;
-    ScopedPointer<TextButton> triggerButton;
     ScopedPointer<ToggleButton> envEnableToggle;
     ScopedPointer<Label> nameLabel;
-    ScopedPointer<TextButton> releaseButton;
     ScopedPointer<ComboBox> loopDirectionComboBox;
     ScopedPointer<ComboBox> susDirectionComboBox;
     ScopedPointer<ToggleButton> envSyncToggle;

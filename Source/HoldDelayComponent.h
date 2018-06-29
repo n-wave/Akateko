@@ -24,10 +24,12 @@
 #include "../JuceLibraryCode/JuceHeader.h"
 #include "PluginProcessor.h"
 
+#include "/work/programming-projects/msm/msm-gui/ParamImageToggle.h"
 #include "/work/programming-projects/msm/msm-gui/ParamSlider.h"
-#include "/work/programming-projects/msm/msm-gui/ParamToggle.h"
 #include <vector>
 
+#include "CustomLookAndFeel.h"
+#include "SliderLookAndFeel.h"
 //[/Headers]
 
 
@@ -51,78 +53,95 @@ public:
 
     //==============================================================================
     //[UserMethods]     -- You can add your own custom methods in this section.
-    enum commandIds{
-        update
-    };
-
     void handleCommandMessage(int commandId) override;
 
     void setBPM(double bpm);
-    void mouseEnter(const MouseEvent &event) override;
-    void mouseExit(const MouseEvent &event) override;
+
+    void buttonStateChanged(Button *button) override;
+
     //[/UserMethods]
 
     void paint (Graphics& g) override;
     void resized() override;
     void sliderValueChanged (Slider* sliderThatWasMoved) override;
     void buttonClicked (Button* buttonThatWasClicked) override;
-    void mouseDown (const MouseEvent& e) override;
-    void mouseUp (const MouseEvent& e) override;
-    bool keyPressed (const KeyPress& key) override;
-
-
-
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
     void initialiseTimeDivision();
-    int findClosestTimeDivision(double time);
+    int findClosestTimeDivision(vector<double> &values, double time);
+    int getTimeDivisionIndex(vector<double> &values, double time);
+
     void initLoopSlider();
+    void initLatchSlider();
 
     void calculateTimeDivision(double bpm);
     void setGlideSliderRange(double bpm);
+    void initialiseMidiStrings();
 
     AkatekoAudioProcessor &processor;
     Label &labelRef;
 
-    AudioProcessorParameter *sync;
-    AudioProcessorParameter *trigger;
-    AudioProcessorParameter *loop;
-    AudioProcessorParameter *speed;
+    AudioProcessorParameter *trigger = nullptr;
 
-    AudioProcessorParameter *gap;
-    AudioProcessorParameter *smooth;
-    AudioProcessorParameter *glide;
+    AudioProcessorParameter *sync = nullptr;
+    AudioProcessorParameter *loop = nullptr;
+    AudioProcessorParameter *speed = nullptr;
 
-    AudioProcessorParameter *fade;
-    AudioProcessorParameter *direction;
-    AudioProcessorParameter *length;
+    AudioProcessorParameter *gap = nullptr;
+    AudioProcessorParameter *smooth = nullptr;
+    AudioProcessorParameter *glide = nullptr;
+
+    AudioProcessorParameter *fade = nullptr;
+    AudioProcessorParameter *direction = nullptr;
+    AudioProcessorParameter *length = nullptr;
+
+    AudioProcessorParameter *latchEnable = nullptr;
+    AudioProcessorParameter *latch = nullptr;
 
 
     StringArray division;
     std::vector<double> timeDivision;
 
+    StringArray latchDivision;
+    std::vector<double> latchValues;
+
+    StringArray midiStrings;
+    std::vector<int> paramIndices;
+    int requestMenuIds[15];
+    PopupMenu menu;
+
+
     String triggerId;
     bool triggerClicked;
     double beatsPerMinute;
+    double glideMaxRange; // 1 whole note
 
     Colour activeColour;
-    //[/UserVariables]
+
+    ScopedPointer<CustomLookAndFeel> claf;
+    ScopedPointer<SliderLookAndFeel> blaf;
+    ScopedPointer<SliderLookAndFeel> pblaf;
+    ScopedPointer<SliderLookAndFeel> dlaf;
 
     //==============================================================================
     ScopedPointer<Slider> loopSlider;
     ScopedPointer<Slider> speedSlider;
     ScopedPointer<Slider> directionSlider;
-    ScopedPointer<ToggleButton> enableToggle;
+    ScopedPointer<ImageButton> enableToggle;
+    ScopedPointer<ImageButton> triggerButton;
     ScopedPointer<Slider> mixSlider;
-    ScopedPointer<ToggleButton> syncToggle;
+    ScopedPointer<ImageButton> syncToggle;
     ScopedPointer<Slider> panSlider;
     ScopedPointer<Slider> lengthSlider;
     ScopedPointer<Slider> glideSlider;
     ScopedPointer<Slider> fadeSlider;
-    ScopedPointer<ToggleButton> glideToggle;
-    ScopedPointer<ToggleButton> gapPositionToggle;
-    Path internalPath1;
+    ScopedPointer<ImageButton> glideToggle;
+    ScopedPointer<ImageButton> gapPositionToggle;
 
+    ScopedPointer<ImageButton> latchToggle; //Latch enabled
+    ScopedPointer<Slider> latchSlider; // Create image for the slider
+
+    //[/UserVariables]
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (HoldDelayComponent)

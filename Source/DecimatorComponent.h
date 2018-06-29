@@ -24,9 +24,12 @@
 #include "../JuceLibraryCode/JuceHeader.h"
 #include "PluginProcessor.h"
 
+#include "/work/programming-projects/msm/msm-gui/ParamImageToggle.h"
 #include "/work/programming-projects/msm/msm-gui/ParamSlider.h"
-#include "/work/programming-projects/msm/msm-gui/ParamToggle.h"
+#include "CustomLookAndFeel.h"
+#include "SliderLookAndFeel.h"
 #include <vector>
+
 //[/Headers]
 
 
@@ -49,9 +52,6 @@ public:
 
     //==============================================================================
     //[UserMethods]     -- You can add your own custom methods in this section.
-    enum commandIds{
-        update
-    };
 
     void handleCommandMessage(int commandId) override;
     //[/UserMethods]
@@ -60,25 +60,33 @@ public:
     void resized() override;
     void sliderValueChanged (Slider* sliderThatWasMoved) override;
 
-
-
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
+    void initialiseMidiStrings();
+
     AkatekoAudioProcessor &processor;
     Label &labelRef;
 
     AudioProcessorParameter *bitReduction;
     AudioProcessorParameter *srateReduction;
+    std::vector<int> paramIndices;
+    int requestMenuIds[7];
+    StringArray midiStrings;
+
+    PopupMenu menu;
+
+    ScopedPointer<CustomLookAndFeel> claf;
+    ScopedPointer<SliderLookAndFeel> blaf;
     //[/UserVariables]
 
     //==============================================================================
     ScopedPointer<Slider> rateSlider;
     ScopedPointer<Slider> bitSlider;
     ScopedPointer<Slider> mixSlider;
-    ScopedPointer<ToggleButton> enableToggle;
-    ScopedPointer<ToggleButton> filterToggle;
-    ScopedPointer<ToggleButton> reduceEnable;
-    ScopedPointer<ToggleButton> srateEnable;
+    ScopedPointer<ImageButton> enableToggle;
+    ScopedPointer<ImageButton> filterToggle;
+    ScopedPointer<ImageButton> reduceEnable;
+    ScopedPointer<ImageButton> srateEnable;
 
 
     //==============================================================================

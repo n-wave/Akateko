@@ -12,6 +12,7 @@
 #define PRESETTABLE_H_INCLUDED
 
 #include "../JuceLibraryCode/JuceHeader.h"
+#include "CustomLookAndFeel.h"
 #include "Akateko.h"
 #include  <vector>
 
@@ -22,6 +23,7 @@ public:
     PresetTable(std::vector<akateko::PresetRow> presets);
     ~PresetTable();
 
+    void setLookAndFeel(LookAndFeel *laf);
     void initialiseHeader(float width, float height);
 
     int getNumRows() override;
@@ -65,7 +67,6 @@ public:
 
     bool getPresetRow(int rowNum, akateko::PresetRow &result);
 
-
     enum CommandIds {
         requestTextEditor
     };
@@ -97,6 +98,11 @@ private:
 
     float cellWidth;
     float cellHeight;
+
+    Colour outlineColour;
+    Colour highLightColour;
+
+    CustomLookAndFeel laf;
 }; // PresetTable
 
 #endif  // PRESETTABLE_H_INCLUDED

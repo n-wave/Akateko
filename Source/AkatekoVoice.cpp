@@ -73,12 +73,12 @@ double AkatekoVoice::getSample(double input){
         if(filterConfig == 0){ //Series
 
             if(filterOneEnabled){
-                tmpSample = filterOne.getSample(tmpSample);
+                tmpSample = filterOne.getSample(tmpSample)*filterOneVolume;
                 //std::cout << "Filter One : " << tmpSample << std::endl;
 
             }
             if(filterTwoEnabled){
-                tmpSample = filterTwo.getSample(tmpSample);
+                tmpSample = filterTwo.getSample(tmpSample)*filterTwoVolume;
                // std::cout << "Filter Two : " << tmpSample << std::endl;
             }
 
@@ -88,10 +88,10 @@ double AkatekoVoice::getSample(double input){
             double tmpParalell = tmpSample;
 
             if(filterOneEnabled){
-                tmpSample = filterOne.getSample(tmpSample);
+                tmpSample = filterOne.getSample(tmpSample)*filterOneVolume;
             }
             if(filterTwoEnabled){
-                tmpParalell = filterTwo.getSample(tmpParalell);
+                tmpParalell = filterTwo.getSample(tmpParalell)*filterTwoVolume;
             }
 
             tmpSample += tmpParalell;
@@ -112,6 +112,11 @@ void AkatekoVoice::enableFilters(bool enable){
 
 void AkatekoVoice::filterConfiguration(int config){
     filterConfig = config;
+}
+
+void AkatekoVoice::setResonanceScalar(double scalar){
+    filterOne.setResonanceScalar(scalar);
+    filterTwo.setResonanceScalar(scalar);
 }
 
 // Filter One

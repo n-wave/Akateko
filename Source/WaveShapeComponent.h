@@ -24,9 +24,13 @@
 #include "../JuceLibraryCode/JuceHeader.h"
 #include "/work/programming-projects/msm/msm-gui/QTableDrawing.h"
 #include "/work/programming-projects/msm/msm-gui/ParamSlider.h"
+#include "/work/programming-projects/msm/msm-gui/ParamImageToggle.h"
 #include "/work/programming-projects/msm/msm-gui/ParamToggle.h"
 
 #include "PluginProcessor.h"
+#include "SliderLookAndFeel.h"
+#include "Akateko.h"
+
 //[/Headers]
 
 
@@ -49,6 +53,7 @@ public:
 
     //==============================================================================
     //[UserMethods]     -- You can add your own custom methods in this section.
+
     void setUpdateCommandId(int hashCode);
 
     String getCurrentShape(); //when shape is updated call and store in the processor
@@ -58,6 +63,7 @@ public:
     msmBuffer getBuffer();
 
     void updateGui();
+    void setLookAndFeel(LookAndFeel* cLaf, LookAndFeel *bLaf);
     //[/UserMethods]
 
     void paint (Graphics& g) override;
@@ -69,13 +75,15 @@ public:
     void modifierKeysChanged (const ModifierKeys& modifiers) override;
 
 
-
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
     void initialiseActiveShape();
     void initialiseDefaultShapes();
     void resetShapButtonColour(int shapeButton);
     void setShape(Button *buttonThatWasClicked, int shape);
+    void setShapeState(ImageButton *buttonClicked);
+
+    void initialiseMidiStrings();
 
     AkatekoAudioProcessor &processor;
 
@@ -92,6 +100,11 @@ private:
     float overlayXPos;
     float overlayYPos;
 
+    int requestMenuIds[11];
+    std::vector<int> paramIndices;
+    StringArray midiStrings;
+    PopupMenu menu;
+
     Colour buttonColour;
     Colour activeColour;
     //[/UserVariables]
@@ -100,18 +113,19 @@ private:
     ScopedPointer<QTableDrawing> waveShaperDrawing;
     ScopedPointer<Slider> waveShapeDriveSlider;
     ScopedPointer<Slider> waveShapeMixSlider;
-    ScopedPointer<ToggleButton> waveshaperToggle;
-    ScopedPointer<TextButton> loadShapeButton;
-    ScopedPointer<TextButton> waveShapeSaveButton;
-    ScopedPointer<TextButton> shapeButtonOne;
-    ScopedPointer<TextButton> shapeButtonTwo;
-    ScopedPointer<TextButton> shapeButtonThree;
-    ScopedPointer<TextButton> shapeButtonFour;
-    ScopedPointer<TextButton> shapeButtonFive;
-    ScopedPointer<TextButton> shapeButtonSix;
-    ScopedPointer<TextButton> clearShapeButton;
-    ScopedPointer<TextButton> shapeButtonSeven;
-    ScopedPointer<TextButton> shapeButtonEight;
+
+    ScopedPointer<ImageButton> waveshaperToggle;
+    ScopedPointer<ImageButton> loadShapeButton;
+    ScopedPointer<ImageButton> waveShapeSaveButton;
+    ScopedPointer<ImageButton> shapeButtonOne;
+    ScopedPointer<ImageButton> shapeButtonTwo;
+    ScopedPointer<ImageButton> shapeButtonThree;
+    ScopedPointer<ImageButton> shapeButtonFour;
+    ScopedPointer<ImageButton> shapeButtonFive;
+    ScopedPointer<ImageButton> shapeButtonSix;
+    ScopedPointer<ImageButton> clearShapeButton;
+    ScopedPointer<ImageButton> shapeButtonSeven;
+    ScopedPointer<ImageButton> shapeButtonEight;
 
 
     //==============================================================================

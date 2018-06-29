@@ -22,15 +22,15 @@ PresetTable::PresetTable(vector<PresetRow> presets) :
     cellWidth(0.f),
     cellHeight(0.f),
     activeRow(-1),
-    currentPresets(presets)
+    currentPresets(presets),
+    outlineColour(Colour(0xFF70C099)),
+    highLightColour(Colour(0x6F20AA9A))
 {
     if(!currentPresets.empty()){
         numRows = currentPresets.size();
     }
 
     sortPresets(nameSortAscending);
-
-
     setColour(backgroundColourId, Colours::black);
 }
 
@@ -38,8 +38,12 @@ PresetTable::~PresetTable(){
 
 }
 
+void PresetTable::setLookAndFeel(LookAndFeel *laf){
+    getHeader().setLookAndFeel(laf);
+}
+
 void PresetTable::initialiseHeader(float width, float height){
-    cellWidth = width*0.32;
+    cellWidth = width*0.3333;
     cellHeight = height*0.085;
 
     getHeader().addColumn("Preset", 1, cellWidth, cellWidth, -1, TableHeaderComponent::visible, -1);
@@ -47,8 +51,10 @@ void PresetTable::initialiseHeader(float width, float height){
     getHeader().addColumn("Author", 3, cellWidth, cellWidth, -1, TableHeaderComponent::visible, -1);
 
     numColums = getHeader().getNumColumns(false);
-    getHeader().setStretchToFitActive(false);
+    getHeader().setStretchToFitActive(true);
     getHeader().setPopupMenuActive(false);
+
+    getViewport()->setScrollBarsShown(false,false,true,false); //enable mouse scrolling for now
 
     setHeaderHeight(cellHeight);
     setRowHeight(cellHeight);
@@ -64,7 +70,7 @@ void PresetTable::paintRowBackground(Graphics &g, int rowNumber, int width, int 
          Colour colour = Colours::black;
 
          if(rowIsSelected){
-             colour = (Colours::darkgrey);
+             colour = (highLightColour);
          }
 
          g.fillAll( colour );
@@ -75,8 +81,8 @@ void PresetTable::paintRowBackground(Graphics &g, int rowNumber, int width, int 
 }
 
 void PresetTable::paintCell(Graphics &g, int rowNumber, int columnId, int width, int height, bool rowIsSelected){
-    g.setColour( Colours::white);
-    g.drawLine( width, 0, width, height);
+    g.setColour(outlineColour);
+    g.fillRect(0, height-1, width, 1);
 
     String tmpCell;
 
@@ -84,12 +90,16 @@ void PresetTable::paintCell(Graphics &g, int rowNumber, int columnId, int width,
         switch(columnId){
             case 1:
                 tmpCell = currentPresets[rowNumber].name;
+                g.fillRect(0, 0, 1, height);
+                g.fillRect(width-1, 0, 1, height);
                 break;
             case 2:
                 tmpCell = currentPresets[rowNumber].category;
+                g.fillRect(width-1, 0, 1, height);
                 break;
             case 3:
                 tmpCell = currentPresets[rowNumber].author;
+                g.fillRect(width-1, 0, 1, height);
                 break;
         }
     }
@@ -214,8 +224,6 @@ void PresetTable::sortPresets(Sort order){
             break;
     }
 }
-
-
 
 
 

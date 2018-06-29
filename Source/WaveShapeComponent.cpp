@@ -22,6 +22,10 @@
 #include <vector>
 
 using std::vector;
+using akateko::MidiRow;
+using akateko::initMidiRow;
+using akateko::IgnoreRightClick;
+
 //[/Headers]
 
 #include "WaveShapeComponent.h"
@@ -65,17 +69,31 @@ WaveShapeComponent::WaveShapeComponent (const String &name, AkatekoAudioProcesso
       activeColour(Colour(0x7f007f7f))
 {
     //[Constructor_pre] You can add your own custom stuff here..
-    vector<int> paramIndices = p.getParameterIndices(AkatekoAudioProcessor::WaveShapeId);
+    paramIndices = p.getParameterIndices(AkatekoAudioProcessor::WaveShapeId);
     StringArray paramNames = p.getParameterIds(AkatekoAudioProcessor::WaveShapeId);
     int nrOfParams = paramIndices.size();
 
     if(nrOfParams == 4){
-        addAndMakeVisible(waveshaperToggle = new ParamToggle (paramNames[0], *p.getParameters().getUnchecked(paramIndices[0]), label));
+        requestMenuIds[0] = paramNames[0].hash();
+        requestMenuIds[1] = paramNames[1].hash();
+        requestMenuIds[2] = paramNames[2].hash();
+        requestMenuIds[3] = String("Shape One").hash();
+        requestMenuIds[4] = String("Shape Two").hash();
+        requestMenuIds[5] = String("Shape Three").hash();
+        requestMenuIds[6] = String("Shape Four").hash();
+        requestMenuIds[7] = String("Shape Five").hash();
+        requestMenuIds[8] = String("Shape Six").hash();
+        requestMenuIds[9] = String("Shape Seven").hash();
+        requestMenuIds[10] = String("Shape Eight").hash();
+
+        initialiseMidiStrings();
+
+        addAndMakeVisible(waveshaperToggle = new ParamImageToggle (paramNames[0], *p.getParameters().getUnchecked(paramIndices[0]), label));
         addAndMakeVisible(waveShapeDriveSlider = new ParamSlider (paramNames[1], *p.getParameters().getUnchecked(paramIndices[1]), label, 0.5f, 1.0f));
         addAndMakeVisible(waveShapeMixSlider = new ParamSlider (paramNames[2], *p.getParameters().getUnchecked(paramIndices[2]), label));
-        activeShape = p.getParameters().getUnchecked(paramIndices[5]);
+        activeShape = p.getParameters().getUnchecked(paramIndices[3]);
     } else {
-        addAndMakeVisible (waveshaperToggle = new ToggleButton ("waveshaperToggle"));
+        addAndMakeVisible (waveshaperToggle = new ImageButton ("waveshaperToggle"));
         addAndMakeVisible (waveShapeDriveSlider = new Slider ("waveShapeDrive"));
         addAndMakeVisible (waveShapeMixSlider = new Slider ("waveShapeMix"));
         activeShape = nullptr;
@@ -91,6 +109,13 @@ WaveShapeComponent::WaveShapeComponent (const String &name, AkatekoAudioProcesso
     waveShaperDrawing->setName ("waveShaper");
     waveShaperDrawing->setFileExtension("shape");
 
+    waveShaperDrawing->setColour(QTableDrawing::backgroundColourId, Colours::black);
+    waveShaperDrawing->setColour(QTableDrawing::outlineColourId, Colour(0xAA407050));
+    waveShaperDrawing->setColour(QTableDrawing::fillColourId, Colour(0xAA70C099));
+    waveShaperDrawing->setColour(QTableDrawing::ellipseColourId, Colour(0xFF60B090));
+    waveShaperDrawing->setColour(QTableDrawing::highLightColourId, Colour(0x9FA0C9B0));
+    waveShaperDrawing->setColour(QTableDrawing::overlayGradientTwoId, Colour(0x4000FFDA));
+
     waveShapeDriveSlider->setRange (0, 1, 0.001);
     waveShapeDriveSlider->setSliderStyle (Slider::RotaryHorizontalDrag);
     waveShapeDriveSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
@@ -100,97 +125,126 @@ WaveShapeComponent::WaveShapeComponent (const String &name, AkatekoAudioProcesso
     waveShapeMixSlider->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
 
     waveshaperToggle->setButtonText (String());
+    waveshaperToggle->setImages(false, true, false,
+                                ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour(0x7F000000),
+                                ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour (0x4F20BFCF),
+                                ImageCache::getFromMemory (BinaryData::ToggleOn_png, BinaryData::ToggleOn_pngSize), 1.0f, Colour (0x3F20BFCF));
+
     waveshaperToggle->addListener(this);
 
     /* Buttons */
-    addAndMakeVisible (loadShapeButton = new TextButton ("loadShapeButton"));
-    loadShapeButton->setButtonText (TRANS("load"));
+
+    // image Buttons use Owned Array
+
+    addAndMakeVisible (loadShapeButton = new ImageButton ("loadShapeButton"));
     loadShapeButton->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     loadShapeButton->addListener (this);
-    loadShapeButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    loadShapeButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    loadShapeButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
-    addAndMakeVisible (waveShapeSaveButton = new TextButton ("waveShapeSave"));
-    waveShapeSaveButton->setButtonText (TRANS("save"));
+    loadShapeButton->setImages (false, true, false,
+                                ImageCache::getFromMemory (BinaryData::loadOff_png, BinaryData::loadOff_pngSize), 1.000f, Colour (0x00000000),
+                                ImageCache::getFromMemory (BinaryData::loadOn_png, BinaryData::loadOn_pngSize), 0.75f, Colour (0x7F709F9F),
+                                ImageCache::getFromMemory (BinaryData::loadOn_png, BinaryData::loadOn_pngSize), 1.000f, Colour (0x1f000000));
+
+    addAndMakeVisible (waveShapeSaveButton = new ImageButton ("waveShapeSave"));
     waveShapeSaveButton->setConnectedEdges (Button::ConnectedOnLeft | Button::ConnectedOnRight);
     waveShapeSaveButton->addListener (this);
-    waveShapeSaveButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    waveShapeSaveButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    waveShapeSaveButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
-    addAndMakeVisible (shapeButtonOne = new TextButton ("Shape One"));
+    waveShapeSaveButton->setImages (false, true, false,
+                                    ImageCache::getFromMemory (BinaryData::saveOff_png, BinaryData::saveOff_pngSize), 1.000f, Colour (0x00000000),
+                                    ImageCache::getFromMemory (BinaryData::saveOn_png, BinaryData::saveOn_pngSize), 0.75f, Colour (0x7F709F9F),
+                                    ImageCache::getFromMemory (BinaryData::saveOn_png, BinaryData::saveOn_pngSize), 1.000f, Colour (0x1f000000));
+
+    addAndMakeVisible (shapeButtonOne = new IgnoreRightClick<ImageButton> ("Shape One"));
     shapeButtonOne->setButtonText (TRANS("1"));
     shapeButtonOne->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     shapeButtonOne->addListener (this);
-    shapeButtonOne->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    shapeButtonOne->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    shapeButtonOne->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
-    addAndMakeVisible (shapeButtonTwo = new TextButton ("Shape Two"));
+    shapeButtonOne->setImages (false, true, false,
+                               ImageCache::getFromMemory (BinaryData::b1off_png, BinaryData::b1off_pngSize), 1.000f, Colour (0x00000000),
+                               ImageCache::getFromMemory (BinaryData::b1on_png, BinaryData::b1on_pngSize), 0.75f, Colour (0x7F709F9F),
+                               ImageCache::getFromMemory (BinaryData::b1on_png, BinaryData::b1on_pngSize), 1.000f, Colour (0x1f000000));
+
+    addAndMakeVisible (shapeButtonTwo = new IgnoreRightClick<ImageButton> ("Shape Two"));
     shapeButtonTwo->setButtonText (TRANS("2"));
     shapeButtonTwo->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     shapeButtonTwo->addListener (this);
-    shapeButtonTwo->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    shapeButtonTwo->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    shapeButtonTwo->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
-    addAndMakeVisible (shapeButtonThree = new TextButton ("Shape Three"));
+    shapeButtonTwo->setImages (false, true, false,
+                               ImageCache::getFromMemory (BinaryData::b2off_png, BinaryData::b2off_pngSize), 1.000f, Colour (0x00000000),
+                               ImageCache::getFromMemory (BinaryData::b2on_png, BinaryData::b2on_pngSize), 0.75f, Colour (0x7F709F9F),
+                               ImageCache::getFromMemory (BinaryData::b2on_png, BinaryData::b2on_pngSize), 1.000f, Colour (0x1f000000));
+
+    addAndMakeVisible (shapeButtonThree = new IgnoreRightClick<ImageButton> ("Shape Three"));
     shapeButtonThree->setButtonText (TRANS("3"));
     shapeButtonThree->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     shapeButtonThree->addListener (this);
-    shapeButtonThree->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    shapeButtonThree->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    shapeButtonThree->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
-    addAndMakeVisible (shapeButtonFour = new TextButton ("Shape Four"));
+    shapeButtonThree->setImages (false, true, false,
+                                 ImageCache::getFromMemory (BinaryData::b3off_png, BinaryData::b3off_pngSize), 1.000f, Colour (0x00000000),
+                                 ImageCache::getFromMemory (BinaryData::b3on_png, BinaryData::b3on_pngSize), 0.75f, Colour (0x7F709F9F),
+                                 ImageCache::getFromMemory (BinaryData::b3on_png, BinaryData::b3on_pngSize), 1.000f, Colour (0x1f000000));
+
+    addAndMakeVisible (shapeButtonFour = new IgnoreRightClick<ImageButton>  ("Shape Four"));
     shapeButtonFour->setButtonText (TRANS("4"));
     shapeButtonFour->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     shapeButtonFour->addListener (this);
-    shapeButtonFour->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    shapeButtonFour->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    shapeButtonFour->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
-    addAndMakeVisible (shapeButtonFive = new TextButton ("Shape Five"));
+    shapeButtonFour->setImages (false, true, false,
+                                ImageCache::getFromMemory (BinaryData::b4off_png, BinaryData::b4off_pngSize), 1.000f, Colour (0x00000000),
+                                ImageCache::getFromMemory (BinaryData::b4on_png, BinaryData::b4on_pngSize), 0.75f, Colour (0x7F709F9F),
+                                ImageCache::getFromMemory (BinaryData::b4on_png, BinaryData::b4on_pngSize), 1.000f, Colour (0x1f000000));
+
+    addAndMakeVisible (shapeButtonFive = new IgnoreRightClick<ImageButton>  ("Shape Five"));
     shapeButtonFive->setButtonText (TRANS("5"));
     shapeButtonFive->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     shapeButtonFive->addListener (this);
-    shapeButtonFive->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    shapeButtonFive->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    shapeButtonFive->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
-    addAndMakeVisible (shapeButtonSix = new TextButton ("Shape Six"));
+    shapeButtonFive->setImages (false, true, false,
+                                ImageCache::getFromMemory (BinaryData::b5off_png, BinaryData::b5off_pngSize), 1.000f, Colour (0x00000000),
+                                ImageCache::getFromMemory (BinaryData::b5on_png, BinaryData::b5on_pngSize), 0.75f, Colour (0x7F709F9F),
+                                ImageCache::getFromMemory (BinaryData::b5on_png, BinaryData::b5on_pngSize), 1.000f, Colour (0x1f000000));
+
+    addAndMakeVisible (shapeButtonSix = new IgnoreRightClick<ImageButton>  ("Shape Six"));
     shapeButtonSix->setButtonText (TRANS("6"));
     shapeButtonSix->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     shapeButtonSix->addListener (this);
-    shapeButtonSix->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    shapeButtonSix->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    shapeButtonSix->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
-    addAndMakeVisible (shapeButtonSeven = new TextButton ("shapeButtonSeven"));
-    shapeButtonSeven->setButtonText (TRANS("7"));
-    shapeButtonSeven->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
-    shapeButtonSeven->addListener (this);
-    shapeButtonSeven->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    shapeButtonSeven->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    shapeButtonSeven->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
+    shapeButtonSix->setImages (false, true, false,
+                               ImageCache::getFromMemory (BinaryData::b6off_png, BinaryData::b6off_pngSize), 1.000f, Colour (0x00000000),
+                               ImageCache::getFromMemory (BinaryData::b6on_png, BinaryData::b6on_pngSize), 0.75f, Colour (0x7F709F9F),
+                               ImageCache::getFromMemory (BinaryData::b6on_png, BinaryData::b6on_pngSize), 1.000f, Colour (0x001f0000));
 
-    addAndMakeVisible (shapeButtonEight = new TextButton ("shapeButtonEight"));
-    shapeButtonEight->setButtonText (TRANS("8"));
-    shapeButtonEight->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
-    shapeButtonEight->addListener (this);
-    shapeButtonEight->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    shapeButtonEight->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    shapeButtonEight->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
-
-    addAndMakeVisible (clearShapeButton = new TextButton ("clearShapeButton"));
+    addAndMakeVisible (clearShapeButton = new IgnoreRightClick<ImageButton>  ("Clear Shape"));
     clearShapeButton->setButtonText (TRANS("clear"));
     clearShapeButton->setConnectedEdges (Button::ConnectedOnLeft | Button::ConnectedOnRight);
     clearShapeButton->addListener (this);
-    clearShapeButton->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    clearShapeButton->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    clearShapeButton->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
+    clearShapeButton->setImages (false, true, false,
+                                 ImageCache::getFromMemory (BinaryData::clearOff_png, BinaryData::clearOff_pngSize), 1.000f, Colour (0x00000000),
+                                 ImageCache::getFromMemory (BinaryData::clearOn_png, BinaryData::clearOn_pngSize), 0.75f, Colour (0x7F709F9F),
+                                 ImageCache::getFromMemory (BinaryData::clearOn_png, BinaryData::clearOn_pngSize), 1.000f, Colour (0x1f000000));
+
+    addAndMakeVisible (shapeButtonSeven = new IgnoreRightClick<ImageButton>  ("Shape Seven"));
+    shapeButtonSeven->setButtonText (TRANS("7"));
+    shapeButtonSeven->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
+    shapeButtonSeven->addListener (this);
+
+    shapeButtonSeven->setImages (false, true, false,
+                                 ImageCache::getFromMemory (BinaryData::b7off_png, BinaryData::b7off_pngSize), 1.000f, Colour (0x00000000),
+                                 ImageCache::getFromMemory (BinaryData::b7on_png, BinaryData::b7on_pngSize), 0.75f, Colour (0x7F709F9F),
+                                 ImageCache::getFromMemory (BinaryData::b7on_png, BinaryData::b7on_pngSize), 1.000f, Colour (0x1f000000));
+
+    addAndMakeVisible (shapeButtonEight = new IgnoreRightClick<ImageButton> ("Shape Eight"));
+    shapeButtonEight->setButtonText (TRANS("8"));
+    shapeButtonEight->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
+    shapeButtonEight->addListener (this);
+
+    shapeButtonEight->setImages (false, true, false,
+                                 ImageCache::getFromMemory (BinaryData::b8off_png, BinaryData::b8off_pngSize), 1.000f, Colour (0x00000000),
+                                 ImageCache::getFromMemory (BinaryData::b8on_png, BinaryData::b8on_pngSize), 0.75f, Colour (0x7F709F9F),
+                                 ImageCache::getFromMemory (BinaryData::b8on_png, BinaryData::b8on_pngSize), 1.000f, Colour (0x1f000000));
+
+    // image
     shapeButtonOne->setMouseClickGrabsKeyboardFocus(false);
     shapeButtonTwo->setMouseClickGrabsKeyboardFocus(false);
     shapeButtonThree->setMouseClickGrabsKeyboardFocus(false);
@@ -206,7 +260,11 @@ WaveShapeComponent::WaveShapeComponent (const String &name, AkatekoAudioProcesso
 
 
     //[Constructor] You can add your own custom stuff here..
-    this->initialiseDefaultShapes();
+
+    // Look And Feel
+
+    //Initialise Waveshaper Shapes
+    initialiseDefaultShapes();
 
     if(activeShape != nullptr){
         const int sIndex = activeShape->getValue();
@@ -217,33 +275,39 @@ WaveShapeComponent::WaveShapeComponent (const String &name, AkatekoAudioProcesso
         /* Set ActiveShape button Colour */
         switch(sIndex){
             case 0:
-                shapeButtonOne->setColour(TextButton::buttonColourId, activeColour);
+                shapeButtonOne->setState(ImageButton::buttonDown);
                 break;
             case 1:
-                shapeButtonTwo->setColour(TextButton::buttonColourId, activeColour);
+                shapeButtonTwo->setState(ImageButton::buttonDown);
                 break;
             case 2:
-                shapeButtonThree->setColour(TextButton::buttonColourId, activeColour);
+                shapeButtonThree->setState(ImageButton::buttonDown);
                 break;
             case 3:
-                shapeButtonFour->setColour(TextButton::buttonColourId, activeColour);
+                shapeButtonFour->setState(ImageButton::buttonDown);
                 break;
             case 4:
-                shapeButtonFive->setColour(TextButton::buttonColourId, activeColour);
+                shapeButtonFive->setState(ImageButton::buttonDown);
                 break;
             case 5:
-                shapeButtonSix->setColour(TextButton::buttonColourId, activeColour);
+                shapeButtonSix->setState(ImageButton::buttonDown);
                 break;
             case 6:
-                shapeButtonSeven->setColour(TextButton::buttonColourId, activeColour);
+                shapeButtonSeven->setState(ImageButton::buttonDown);
                 break;
             case 7:
-                shapeButtonSeven->setColour(TextButton::buttonColourId, activeColour);
+                shapeButtonSeven->setState(ImageButton::buttonDown);
                 break;
             default:
                 std::cerr << "Wrong Shape number supplied" << std::endl;
         }
     }
+
+
+    /* Build Menu */
+    menu.addItem(1, "learn", true, false, nullptr);
+    menu.addSeparator();
+    menu.addItem(0xFF, "clear");
 
     //[/Constructor]
 }
@@ -279,6 +343,18 @@ WaveShapeComponent::~WaveShapeComponent()
 void WaveShapeComponent::paint (Graphics& g)
 {
     //[UserPrePaint] Add your own custom painting code here..
+    const int aShape = activeShape->getValue();
+
+    switch(aShape){
+        case 0: setShapeState(shapeButtonOne); break;
+        case 1: setShapeState(shapeButtonTwo); break;
+        case 2: setShapeState(shapeButtonThree); break;
+        case 3: setShapeState(shapeButtonFour); break;
+        case 4: setShapeState(shapeButtonFive); break;
+        case 5: setShapeState(shapeButtonSix); break;
+        case 6: setShapeState(shapeButtonSeven); break;
+        case 7: setShapeState(shapeButtonEight); break;
+    }
 
     //[/UserPrePaint]
 
@@ -297,6 +373,7 @@ void WaveShapeComponent::paint (Graphics& g)
     //[UserPaint] Add your own custom painting code here..
 
 
+
     //[/UserPaint]
 }
 
@@ -306,20 +383,22 @@ void WaveShapeComponent::resized()
     //[/UserPreResize]
 
     waveShaperDrawing->setBounds (8, 24, 160, 160);
-    waveShapeDriveSlider->setBounds (183, 112, 60, 60);
-    waveShapeMixSlider->setBounds (183, 32, 60, 60);
-    waveshaperToggle->setBounds (232, 0, 24, 24);
-    loadShapeButton->setBounds (176, 197, 36, 24);
-    waveShapeSaveButton->setBounds (212, 197, 36, 24);
-    shapeButtonOne->setBounds (8, 197, 40, 24);
-    shapeButtonTwo->setBounds (48, 197, 40, 24);
-    shapeButtonThree->setBounds (88, 197, 40, 24);
-    shapeButtonFour->setBounds (128, 197, 40, 24);
-    shapeButtonFive->setBounds (8, 221, 40, 24);
-    shapeButtonSix->setBounds (48, 221, 40, 24);
-    clearShapeButton->setBounds (176, 221, 72, 24);
-    shapeButtonSeven->setBounds (88, 221, 40, 24);
-    shapeButtonEight->setBounds (128, 221, 40, 24);
+    waveShapeMixSlider->setBounds (182, 28, 68, 68);
+    waveShapeDriveSlider->setBounds (182, 110, 68, 68);
+    waveshaperToggle->setBounds (234, 3, 18, 18);
+
+    shapeButtonOne->setBounds (9, 198, 38, 22);
+    shapeButtonTwo->setBounds (49, 198, 38, 22);
+    shapeButtonThree->setBounds (89, 198, 38, 22);
+    shapeButtonFour->setBounds (129, 198, 38, 22);
+    shapeButtonFive->setBounds (9, 222, 38, 22);
+    shapeButtonSix->setBounds (49, 222, 38, 22);
+    shapeButtonSeven->setBounds (89, 222, 38, 22);
+    shapeButtonEight->setBounds (129, 222, 38, 22);
+
+    clearShapeButton->setBounds (177, 222, 70, 22);
+    waveShapeSaveButton->setBounds (213, 198, 34, 22);
+    loadShapeButton->setBounds (177, 198, 34, 22);
     //[UserResized] Add your own custom resize handling here..
 
 
@@ -412,7 +491,7 @@ void WaveShapeComponent::buttonClicked (Button* buttonThatWasClicked)
 
             currentShapes.set(sIndex, tmpShape);
             processor.setWaveShaperBuffer(buffer);
-            processor.updateShape(currentShapes[sIndex], AkatekoAudioProcessor::WaveShapeId);
+            processor.setShape(currentShapes[sIndex], AkatekoAudioProcessor::WaveShapeId);
         }
 
         this->repaint();
@@ -437,23 +516,6 @@ void WaveShapeComponent::buttonClicked (Button* buttonThatWasClicked)
     //[/UserbuttonClicked_Post]
 }
 
-void WaveShapeComponent::handleCommandMessage (int commandId)
-{
-    //[UserCode_handleCommandMessage] -- Add your code here...
-    if(commandId == QTableDrawing::qtableUpdated){
-        waveShaperDrawing->fillBuffer();
-        msmBuffer buffer = waveShaperDrawing->getBuffer();
-
-        if(activeShape != nullptr){
-            const int tmpShape = activeShape->getValue();
-            const String newShape = waveShaperDrawing->toString();
-
-            currentShapes.set(tmpShape, newShape);
-            processor.setWaveShaperBuffer(buffer);
-        }
-    }
-    //[/UserCode_handleCommandMessage]
-}
 
 void WaveShapeComponent::mouseEnter (const MouseEvent& e)
 {
@@ -482,14 +544,15 @@ void WaveShapeComponent::modifierKeysChanged (const ModifierKeys& modifiers)
 
 //[MiscUserCode] You can add your own definitions of your custom methods or any other code here...
 void WaveShapeComponent::initialiseDefaultShapes(){
-    defaultShapes.add(String("m 8 152 q 80 80 152 8"));
-    defaultShapes.add(String("m 8 152 q 41 152 80 80 115 10 152 8"));
-    defaultShapes.add(String("m 8 152 q 80 152 80 80 80 8 152 8"));
-    defaultShapes.add(String("m 8 152 q 31 152 44 152 80 152 80 80 80 8 116 8 126 8 152 8"));
-    defaultShapes.add(String("m 8 152 q 33 152 44 137 62 108.5 80 80 98 53 116 26 123 8 152 8"));
-    defaultShapes.add(String("m 8 152 q 26 144.5 44 137 62 108.5 80 80 98 53 116 26 134 17 152 8"));
-    defaultShapes.add(String("m 8 152 q 26 152 44 152 62 116 80 80 98 44 116 8 134 8 152 8"));
-    defaultShapes.add(String("m 8 152 q 77 147 80 80 88 8 116 8 134 8 152 8"));
+    defaultShapes.clear();
+    defaultShapes.add(akateko::ws_default_shapes[0]);
+    defaultShapes.add(akateko::ws_default_shapes[1]);
+    defaultShapes.add(akateko::ws_default_shapes[2]);
+    defaultShapes.add(akateko::ws_default_shapes[3]);
+    defaultShapes.add(akateko::ws_default_shapes[4]);
+    defaultShapes.add(akateko::ws_default_shapes[5]);
+    defaultShapes.add(akateko::ws_default_shapes[6]);
+    defaultShapes.add(akateko::ws_default_shapes[7]);
 
     currentShapes = StringArray(defaultShapes);
 }
@@ -534,28 +597,28 @@ void WaveShapeComponent::setUpdateCommandId(int hashCode){
 void WaveShapeComponent::resetShapButtonColour(int shapeButton){
     switch(shapeButton){
         case 0:
-            shapeButtonOne->setColour(TextButton::buttonColourId, buttonColour);
+            shapeButtonOne->setState(ImageButton::buttonNormal);
             break;
         case 1:
-            shapeButtonTwo->setColour(TextButton::buttonColourId, buttonColour);
+            shapeButtonTwo->setState(ImageButton::buttonNormal);
             break;
         case 2:
-            shapeButtonThree->setColour(TextButton::buttonColourId, buttonColour);
+            shapeButtonThree->setState(ImageButton::buttonNormal);
             break;
         case 3:
-            shapeButtonFour->setColour(TextButton::buttonColourId, buttonColour);
+            shapeButtonFour->setState(ImageButton::buttonNormal);
             break;
         case 4:
-            shapeButtonFive->setColour(TextButton::buttonColourId, buttonColour);
+            shapeButtonFive->setState(ImageButton::buttonNormal);
             break;
         case 5:
-            shapeButtonSix->setColour(TextButton::buttonColourId, buttonColour);
+            shapeButtonSix->setState(ImageButton::buttonNormal);
             break;
         case 6:
-            shapeButtonSeven->setColour(TextButton::buttonColourId, buttonColour);
+            shapeButtonSeven->setState(ImageButton::buttonNormal);
             break;
         case 7:
-            shapeButtonEight->setColour(TextButton::buttonColourId, buttonColour);
+            shapeButtonEight->setState(ImageButton::buttonNormal);
             break;
         default:
             std::cerr << "Wrong button number supplied" << std::endl;
@@ -582,10 +645,10 @@ void WaveShapeComponent::setShape(Button *buttonThatWasClicked, int shape){
             labelRef.setText(tmpString, dontSendNotification);
         }
 
-        buttonThatWasClicked->setColour(TextButton::buttonColourId, activeColour);
+        buttonThatWasClicked->setState(ImageButton::buttonOver);
 
         processor.setWaveShaperBuffer(buffer);
-        processor.updateShape(currentShapes[shape], AkatekoAudioProcessor::WaveShapeId);
+        processor.setShape(currentShapes[shape], AkatekoAudioProcessor::WaveShapeId);
     }
 }
 
@@ -603,34 +666,6 @@ void WaveShapeComponent::initialiseActiveShape(){
             waveShaperDrawing->restoreFromString(currentShapes[sIndex]);
         }
         /* Set ActiveShape button Colour */
-        switch(sIndex){
-            case 0:
-                shapeButtonOne->setColour(TextButton::buttonColourId, activeColour);
-                break;
-            case 1:
-                shapeButtonTwo->setColour(TextButton::buttonColourId, activeColour);
-                break;
-            case 2:
-                shapeButtonThree->setColour(TextButton::buttonColourId, activeColour);
-                break;
-            case 3:
-                shapeButtonFour->setColour(TextButton::buttonColourId, activeColour);
-                break;
-            case 4:
-                shapeButtonFive->setColour(TextButton::buttonColourId, activeColour);
-                break;
-            case 5:
-                shapeButtonSix->setColour(TextButton::buttonColourId, activeColour);
-                break;
-            case 6:
-                shapeButtonSeven->setColour(TextButton::buttonColourId, activeColour);
-                break;
-            case 7:
-                shapeButtonSeven->setColour(TextButton::buttonColourId, activeColour);
-                break;
-            default:
-                std::cerr << "Wrong Shape number supplied" << std::endl;
-        }
 
         /* Restore Buffer in processor */
 
@@ -650,6 +685,168 @@ void WaveShapeComponent::updateGui(){
     waveShapeMixSlider->postCommandMessage(ParamSlider::update);
     initialiseActiveShape();
 }
+
+/* Call in paint if button is down, get the state and check for
+   for hovered state, if true set hovered else button should be down
+   based on the active shape value.
+
+   On a later point refactor it differently by ditching the individual
+   shape buttons and place them in an array
+ */
+void WaveShapeComponent::setShapeState(ImageButton *buttonClicked){
+    const int tmpState = buttonClicked->getState();
+
+    if(tmpState != ImageButton::buttonOver){
+        buttonClicked->setState(ImageButton::buttonDown);
+    }
+}
+
+void WaveShapeComponent::setLookAndFeel(LookAndFeel *cLaf, LookAndFeel *bLaf)
+{
+    waveShapeDriveSlider->setLookAndFeel(bLaf);
+    waveShapeMixSlider->setLookAndFeel(bLaf);
+    waveShaperDrawing->setLookAndFeel(cLaf);
+    menu.setLookAndFeel(cLaf);
+}
+
+void WaveShapeComponent::initialiseMidiStrings(){
+    midiStrings.clear();
+
+    midiStrings.add(" WShaper: Enable");
+    midiStrings.add(" WShaper: Drive");
+    midiStrings.add(" WShaper: Mix");
+    midiStrings.add(" WShaper: Shape 1");
+    midiStrings.add(" WShaper: Shape 2");
+    midiStrings.add(" WShaper: Shape 3");
+    midiStrings.add(" WShaper: Shape 4");
+    midiStrings.add(" WShaper: Shape 5");
+    midiStrings.add(" WShaper: Shape 6");
+    midiStrings.add(" WShaper: Shape 7");
+    midiStrings.add(" WShaper: Shape 8");
+}
+
+void WaveShapeComponent::handleCommandMessage (int commandId)
+{
+    //[UserCode_handleCommandMessage] -- Add your code here...
+    if(commandId == QTableDrawing::qtableUpdated){
+        waveShaperDrawing->fillBuffer();
+        msmBuffer buffer = waveShaperDrawing->getBuffer();
+
+        if(activeShape != nullptr){
+            const int tmpShape = activeShape->getValue();
+            const String newShape = waveShaperDrawing->toString();
+
+            currentShapes.set(tmpShape, newShape);
+            processor.setWaveShaperBuffer(buffer);
+        }
+    } else if(paramIndices.size() == 4 &&
+               midiStrings.size() == 11)
+    {
+        int index = -1;
+        int param = -1;
+        int paramIndex = -1;
+        int handling = -1;
+        double minValue = 0.0;
+        double maxValue = 1.0;
+
+        if(commandId == requestMenuIds[0]){ // WaveShaper Enable
+            index = menu.show();
+            param = 0;
+            paramIndex = 0;
+            handling = akateko::MIDI_TO_INT_TOGGLE;
+        } else if(commandId == requestMenuIds[1]){ // WaveShaper Drive
+            index = menu.show();
+            param = 1;
+            paramIndex = 1;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuIds[2]){ // WaveShaper Mix
+            index = menu.show();
+            param = 2;
+            paramIndex = 2;
+            handling = akateko::MIDI_TO_DOUBLE;
+        } else if(commandId == requestMenuIds[3]){ // WaveShaper Shape 1
+            resetShapButtonColour(0);
+            index = menu.show();
+            param = 3;
+            paramIndex = 3;
+            maxValue = 0;
+            handling = akateko::MIDI_TO_CONSTANT;
+        } else if(commandId == requestMenuIds[4]){ // WaveShaper Shape 2
+            resetShapButtonColour(1);
+            index = menu.show();
+            param = 4;
+            paramIndex = 3;
+            minValue = 1;
+            handling = akateko::MIDI_TO_CONSTANT;
+        } else if(commandId == requestMenuIds[5]){ // WaveShaper Shape 3
+            resetShapButtonColour(2);
+            index = menu.show();
+            param = 5;
+            paramIndex = 3;
+            minValue = 2;
+            maxValue = 2;
+            handling = akateko::MIDI_TO_CONSTANT;
+        } else if(commandId == requestMenuIds[6]){ // WaveShaper Shape 4
+            resetShapButtonColour(3);
+            index = menu.show();
+            param = 6;
+            paramIndex = 3;
+            minValue = 3;
+            maxValue = 3;
+            handling = akateko::MIDI_TO_CONSTANT;
+        } else if(commandId == requestMenuIds[7]){ // WaveShaper Shape 5
+            resetShapButtonColour(4);
+            index = menu.show();
+            param = 7;
+            paramIndex = 3;
+            minValue = 4;
+            maxValue = 4;
+            handling = akateko::MIDI_TO_CONSTANT;
+        } else if(commandId == requestMenuIds[8]){ // WaveShaper Shape 6
+            resetShapButtonColour(5);
+            index = menu.show();
+            param = 8;
+            paramIndex = 3;
+            minValue = 5;
+            maxValue = 5;
+            handling = akateko::MIDI_TO_CONSTANT;
+        } else if(commandId == requestMenuIds[9]){ // WaveShaper Shape 7
+            resetShapButtonColour(6);
+            index = menu.show();
+            param = 9;
+            paramIndex = 3;
+            minValue = 6;
+            maxValue = 6;
+            handling = akateko::MIDI_TO_CONSTANT;
+        } else if(commandId == requestMenuIds[10]){ // WaveShaper Shape 8
+            resetShapButtonColour(7);
+            index = menu.show();
+            param = 10;
+            paramIndex = 3;
+            minValue = 7;
+            maxValue = 7;
+            handling = akateko::MIDI_TO_CONSTANT;
+        }
+
+        if(index == 1){
+            MidiRow tmpRow;
+
+            initMidiRow(tmpRow, param, 0, 127, minValue, maxValue, paramIndices[paramIndex], handling, midiStrings[param], 2);
+            processor.initiateMidiLearn(tmpRow);
+        } else if(index == 0xFF){
+            if(param >= 0 && param <= 3){
+                processor.removeMidiRow(paramIndices[paramIndex]);
+            } else {
+                processor.removeMidiRow(param, paramIndices[paramIndex]);
+            }
+
+            String message = midiStrings[param] + String(" cleared");
+            labelRef.setText(message, sendNotificationAsync);
+        }
+    }
+    //[/UserCode_handleCommandMessage]
+}
+
 
 //[/MiscUserCode]
 
@@ -693,54 +890,54 @@ BEGIN_JUCER_METADATA
           min="0" max="1" int="0" style="RotaryHorizontalDrag" textBoxPos="NoTextBox"
           textBoxEditable="0" textBoxWidth="80" textBoxHeight="20" skewFactor="1"
           needsCallback="0"/>
-  <TOGGLEBUTTON name="waveshaperToggle" id="18447cc74b490f5" memberName="waveshaperToggle"
+  <IMAGEBUTTON  name="waveshaperToggle" id="18447cc74b490f5" memberName="waveshaperToggle"
                 virtualName="ToggleButton" explicitFocusOrder="0" pos="232 0 24 24"
                 buttonText="" connectedEdges="0" needsCallback="0" radioGroupId="0"
                 state="0"/>
-  <TEXTBUTTON name="loadShapeButton" id="8d3ade691db684c4" memberName="loadShapeButton"
-              virtualName="" explicitFocusOrder="0" pos="176 197 36 24" bgColOff="73707070"
-              bgColOn="ff464646" textCol="fff0f0f0" buttonText="load" connectedEdges="12"
-              needsCallback="1" radioGroupId="0"/>
-  <TEXTBUTTON name="waveShapeSave" id="87daf60a80bf251d" memberName="waveShapeSaveButton"
-              virtualName="" explicitFocusOrder="0" pos="212 197 36 24" bgColOff="73707070"
-              bgColOn="ff464646" textCol="fff0f0f0" buttonText="save" connectedEdges="3"
-              needsCallback="1" radioGroupId="0"/>
-  <TEXTBUTTON name="shapeButtonOne" id="76af27469265e466" memberName="shapeButtonOne"
-              virtualName="" explicitFocusOrder="0" pos="8 197 40 24" bgColOff="73707070"
-              bgColOn="ff464646" textCol="fff0f0f0" buttonText="1" connectedEdges="12"
-              needsCallback="1" radioGroupId="0"/>
-  <TEXTBUTTON name="shapeButtonTwo" id="dcd18eb4b7c3527a" memberName="shapeButtonTwo"
-              virtualName="" explicitFocusOrder="0" pos="48 197 40 24" bgColOff="73707070"
-              bgColOn="ff464646" textCol="fff0f0f0" buttonText="2" connectedEdges="12"
-              needsCallback="1" radioGroupId="0"/>
-  <TEXTBUTTON name="shapeButtonThree" id="4c4729d408f39c67" memberName="shapeButtonThree"
-              virtualName="" explicitFocusOrder="0" pos="88 197 40 24" bgColOff="73707070"
-              bgColOn="ff464646" textCol="fff0f0f0" buttonText="3" connectedEdges="12"
-              needsCallback="1" radioGroupId="0"/>
-  <TEXTBUTTON name="shapeButtonFour" id="4fe4dd2b8352ff7a" memberName="shapeButtonFour"
-              virtualName="" explicitFocusOrder="0" pos="128 197 40 24" bgColOff="73707070"
-              bgColOn="ff464646" textCol="fff0f0f0" buttonText="4" connectedEdges="12"
-              needsCallback="1" radioGroupId="0"/>
-  <TEXTBUTTON name="shapeButtonFive" id="e46d2cf6bb9f8ce2" memberName="shapeButtonFive"
-              virtualName="" explicitFocusOrder="0" pos="8 221 40 24" bgColOff="73707070"
-              bgColOn="ff464646" textCol="fff0f0f0" buttonText="5" connectedEdges="12"
-              needsCallback="1" radioGroupId="0"/>
-  <TEXTBUTTON name="shapeButtonSix" id="383f2b3a0cf5ea4d" memberName="shapeButtonSix"
-              virtualName="" explicitFocusOrder="0" pos="48 221 40 24" bgColOff="73707070"
-              bgColOn="ff464646" textCol="fff0f0f0" buttonText="6" connectedEdges="12"
-              needsCallback="1" radioGroupId="0"/>
-  <TEXTBUTTON name="clearShapeButton" id="89fdc3342641232e" memberName="clearShapeButton"
-              virtualName="" explicitFocusOrder="0" pos="176 221 72 24" bgColOff="73707070"
-              bgColOn="ff464646" textCol="fff0f0f0" buttonText="clear" connectedEdges="3"
-              needsCallback="1" radioGroupId="0"/>
-  <TEXTBUTTON name="shapeButtonSeven" id="da21b226956fb35d" memberName="shapeButtonSeven"
-              virtualName="" explicitFocusOrder="0" pos="88 221 40 24" bgColOff="73707070"
-              bgColOn="ff464646" textCol="fff0f0f0" buttonText="7" connectedEdges="12"
-              needsCallback="1" radioGroupId="0"/>
-  <TEXTBUTTON name="shapeButtonEight" id="bcfa7a8be7fbe81e" memberName="shapeButtonEight"
-              virtualName="" explicitFocusOrder="0" pos="128 221 40 24" bgColOff="73707070"
-              bgColOn="ff464646" textCol="fff0f0f0" buttonText="8" connectedEdges="12"
-              needsCallback="1" radioGroupId="0"/>
+  <IMAGEBUTTON name="loadShapeButton" id="8d3ade691db684c4" memberName="loadShapeButton"
+               virtualName="" explicitFocusOrder="0" pos="176 197 36 24" bgColOff="73707070"
+               bgColOn="ff464646" textCol="fff0f0f0" buttonText="load" connectedEdges="12"
+               needsCallback="1" radioGroupId="0"/>
+  <IMAGEBUTTON name="waveShapeSave" id="87daf60a80bf251d" memberName="waveShapeSaveButton"
+               virtualName="" explicitFocusOrder="0" pos="212 197 36 24" bgColOff="73707070"
+               bgColOn="ff464646" textCol="fff0f0f0" buttonText="save" connectedEdges="3"
+               needsCallback="1" radioGroupId="0"/>
+  <IMAGEBUTTON name="shapeButtonOne" id="76af27469265e466" memberName="shapeButtonOne"
+               virtualName="" explicitFocusOrder="0" pos="8 197 40 24" bgColOff="73707070"
+               bgColOn="ff464646" textCol="fff0f0f0" buttonText="1" connectedEdges="12"
+               needsCallback="1" radioGroupId="0"/>
+  <IMAGEBUTTON name="shapeButtonTwo" id="dcd18eb4b7c3527a" memberName="shapeButtonTwo"
+               virtualName="" explicitFocusOrder="0" pos="48 197 40 24" bgColOff="73707070"
+               bgColOn="ff464646" textCol="fff0f0f0" buttonText="2" connectedEdges="12"
+               needsCallback="1" radioGroupId="0"/>
+  <IMAGEBUTTON name="shapeButtonThree" id="4c4729d408f39c67" memberName="shapeButtonThree"
+               virtualName="" explicitFocusOrder="0" pos="88 197 40 24" bgColOff="73707070"
+               bgColOn="ff464646" textCol="fff0f0f0" buttonText="3" connectedEdges="12"
+               needsCallback="1" radioGroupId="0"/>
+  <IMAGEBUTTON name="shapeButtonFour" id="4fe4dd2b8352ff7a" memberName="shapeButtonFour"
+               virtualName="" explicitFocusOrder="0" pos="128 197 40 24" bgColOff="73707070"
+               bgColOn="ff464646" textCol="fff0f0f0" buttonText="4" connectedEdges="12"
+               needsCallback="1" radioGroupId="0"/>
+  <IMAGEBUTTON name="shapeButtonFive" id="e46d2cf6bb9f8ce2" memberName="shapeButtonFive"
+               virtualName="" explicitFocusOrder="0" pos="8 221 40 24" bgColOff="73707070"
+               bgColOn="ff464646" textCol="fff0f0f0" buttonText="5" connectedEdges="12"
+               needsCallback="1" radioGroupId="0"/>
+  <IMAGEBUTTON  name="shapeButtonSix" id="383f2b3a0cf5ea4d" memberName="shapeButtonSix"
+               virtualName="" explicitFocusOrder="0" pos="48 221 40 24" bgColOff="73707070"
+               bgColOn="ff464646" textCol="fff0f0f0" buttonText="6" connectedEdges="12"
+               needsCallback="1" radioGroupId="0"/>
+  <IMAGEBUTTON name="clearShapeButton" id="89fdc3342641232e" memberName="clearShapeButton"
+               virtualName="" explicitFocusOrder="0" pos="176 221 72 24" bgColOff="73707070"
+               bgColOn="ff464646" textCol="fff0f0f0" buttonText="clear" connectedEdges="3"
+               needsCallback="1" radioGroupId="0"/>
+  <IMAGEBUTTON name="shapeButtonSeven" id="da21b226956fb35d" memberName="shapeButtonSeven"
+               virtualName="" explicitFocusOrder="0" pos="88 221 40 24" bgColOff="73707070"
+               bgColOn="ff464646" textCol="fff0f0f0" buttonText="7" connectedEdges="12"
+               needsCallback="1" radioGroupId="0"/>
+  <IMAGEBUTTON name="shapeButtonEight" id="bcfa7a8be7fbe81e" memberName="shapeButtonEight"
+               virtualName="" explicitFocusOrder="0" pos="128 221 40 24" bgColOff="73707070"
+               bgColOn="ff464646" textCol="fff0f0f0" buttonText="8" connectedEdges="12"
+               needsCallback="1" radioGroupId="0"/>
 </JUCER_COMPONENT>
 
 END_JUCER_METADATA

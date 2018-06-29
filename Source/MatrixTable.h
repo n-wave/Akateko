@@ -12,6 +12,7 @@
 #define MATRIXTABLE_H_INCLUDED
 
 #include "../JuceLibraryCode/JuceHeader.h"
+#include "CustomLookAndFeel.h"
 #include "/work/programming-projects/msm/msm-dsp/Common/msm.h"
 #include "AkatekoMatrix.h"
 #include <vector>
@@ -24,6 +25,8 @@ class MatrixTable    : public TableListBox,
 public:
     MatrixTable(ModulationMatrix &modm);
     ~MatrixTable();
+
+    void setLookAndFeel(LookAndFeel *laf);
 
     msm::MatrixRow getMatrixRow(int id);
     void updateGui();
@@ -52,8 +55,6 @@ public:
                                        int columnId,
                                        bool isRowSelected,
                                        Component *existingComponentToUpdate) override;
-
-
 
     void initialiseHeader(float width, float height);
     void setSources(StringArray &src);
@@ -113,6 +114,7 @@ private:
 
     /* Colours */
     Colour textColour;
+    Colour outlineColour;
 
     ScopedPointer<PopupMenu> menu;
 
@@ -134,11 +136,8 @@ private:
     StringArray fxOneDestinations;
     StringArray fxTwoDestinations;
 
-    //Stereo Delay
-    StringArray StereoDelayParams;
-    StringArray PingPongDelayParams;
-    StringArray LCRDelayParams;
 
+    CustomLookAndFeel laf;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MatrixTable)
 };
 

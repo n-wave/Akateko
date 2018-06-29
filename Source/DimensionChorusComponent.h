@@ -23,8 +23,11 @@
 //[Headers]     -- You can add your own extra header files here --
 #include "../JuceLibraryCode/JuceHeader.h"
 #include "PluginProcessor.h"
+#include "SliderLookAndFeel.h"
+#include "CustomLookAndFeel.h"
+
+#include "/work/programming-projects/msm/msm-gui/ParamImageToggle.h"
 #include "/work/programming-projects/msm/msm-gui/ParamSlider.h"
-#include "/work/programming-projects/msm/msm-gui/ParamToggle.h"
 #include "/work/programming-projects/msm/msm-dsp/Generators/QuadratureOscillator.h"
 //[/Headers]
 
@@ -48,12 +51,10 @@ public:
 
     //==============================================================================
     //[UserMethods]     -- You can add your own custom methods in this section.
-    enum commandIds{
-        update
-    };
 
     void handleCommandMessage(int commandId) override;
     void updateGui();
+
     //[/UserMethods]
 
     void paint (Graphics& g) override;
@@ -64,12 +65,25 @@ public:
 
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
+    void initialiseMidiStrings();
+
     AkatekoAudioProcessor &processor;
     Label &labelRef;
 
     AudioProcessorParameter *sync;
     AudioProcessorParameter *wave;
     AudioProcessorParameter *spread;
+
+    std::vector<int> paramIndices;
+    StringArray midiStrings;
+    int requestMenuIds[9];
+    PopupMenu menu;
+    //int re
+
+    ScopedPointer<CustomLookAndFeel> claf;
+    ScopedPointer<SliderLookAndFeel> blaf;
+    ScopedPointer<SliderLookAndFeel> w2laf;
+    ScopedPointer<SliderLookAndFeel> pblaf;
     //[/UserVariables]
 
     //==============================================================================
@@ -81,7 +95,7 @@ private:
     ScopedPointer<Slider> centerPanSlider;
     ScopedPointer<Slider> frequencySlider;
     ScopedPointer<Slider> waveSlider;
-    ScopedPointer<ToggleButton> enableToggle;
+    ScopedPointer<ImageButton> enableToggle;
 
 
     //==============================================================================

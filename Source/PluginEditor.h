@@ -32,7 +32,13 @@
 #include "/work/programming-projects/msm/msm-gui/ParamToggle.h"
 #include "/work/programming-projects/msm/msm-gui/ParamComboBox.h"
 #include "/work/programming-projects/msm/msm-gui/NumberBox.h"
-#include "/work/programming-projects/msm/msm-gui/XYPad.h"
+
+
+#include "XYPad.h"
+#include "CustomLookAndFeel.h"
+#include "SliderLookAndFeel.h"
+#include "SliderLookAndFeelBottomV1.h"
+#include "SliderLookAndFeelBottomV2.h"
 
 #include "AkatekoMatrix.h"
 #include "LFOComponent.h"
@@ -43,6 +49,8 @@
 #include "MatrixTable.h"
 #include "FXContainer.h"
 #include "PresetComponent.h"
+
+#include "BackPanel.h"
 
 #include "Akateko.h"
 //[/Headers]
@@ -58,7 +66,9 @@
                                                                     //[/Comments]
 */
 class AkatekoAudioProcessorEditor  : public AudioProcessorEditor,
-                                     public ButtonListener
+                                     public ButtonListener,
+                                     public SliderListener,
+                                     public Timer
 {
 public:
     //==============================================================================
@@ -78,7 +88,19 @@ public:
         PRST
     };
 
+    enum CommandId {
+        updateTimeId,
+    };
+
     void setEffectParameterDestinations(StringArray &params, int effect);
+    void updateGui();
+
+    void paintOverChildren(Graphics &g) override;
+    void sliderValueChanged(Slider *slider) override;
+
+    bool keyPressed(const KeyPress &key) override;
+
+    void timerCallback() override;
     //[/UserMethods]
 
     void paint (Graphics& g) override;
@@ -87,34 +109,19 @@ public:
     void visibilityChanged() override;
     void handleCommandMessage (int commandId) override;
 
-    void updateGui();
-
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
     void initialiseDisplayLabel();
     void initialiseModulationContainer();
     void initialiseEffectContainer();
     void initialiseToolBarSection();
-
+    void setButtonState(ImageButton *button);
+    void updateGuiSection(int section);
     /* Call after AudioProcessrParameters() */
     void hideModulationComponent(int modComponentId);
 
-    BeatDivisor beatDivisor; //Used For LFO's
-
-    Label presetLabel;
-    Label paramLabel;
-    AkatekoAudioProcessor &processor;
-
-    ScopedPointer<LFOComponent> lfoOne;
-    ScopedPointer<LFOComponent> lfoTwo;
-    ScopedPointer<EnvelopeComponent> envOne;
-    ScopedPointer<EnvelopeComponent> envTwo;
-    ScopedPointer<StepSequencerComponent> stepSeq;
-    ScopedPointer<PresetComponent> preset;
-
-    /* Test Values for binding XYPad remove later */
-
-
+    int midiLearnFlash;
+    bool modInitialized;
     double currentBPM;
     int activeModulation;
 
@@ -123,21 +130,55 @@ private:
     int effectTwoCommandId;
     int presetCommandId;
 
+    int requestMenuId[2];
+
     Colour buttonColour;
     Colour activeColour;
+    ColourGradient overlay;
 
     Image backGroundImage;
-    //[/UserVariables]
 
+    std::vector<int> paramIndices;
+    StringArray midiStrings;
+    PopupMenu menu;
+
+    Label presetLabel;
+    Label paramLabel;
+    Label bpmLabel;
+
+    AkatekoAudioProcessor &processor;
+    AudioProcessorParameter *inputVolume = nullptr;
+    AudioProcessorParameter *outputVolume = nullptr;
+
+    ScopedPointer<CustomLookAndFeel> claf;
+    ScopedPointer<SliderLookAndFeelBottomV1> r1laf;
+    ScopedPointer<SliderLookAndFeelBottomV2> r2laf;
+    ScopedPointer<SliderLookAndFeel> slaf;
+    ScopedPointer<SliderLookAndFeel> blaf;
+
+    // Modulation Components
+    ScopedPointer<LFOComponent> lfoOne;
+    ScopedPointer<LFOComponent> lfoTwo;
+    ScopedPointer<EnvelopeComponent> envOne;
+    ScopedPointer<EnvelopeComponent> envTwo;
+    ScopedPointer<StepSequencerComponent> stepSeq;
+    ScopedPointer<PresetComponent> preset;
+
+    // DBMeter
+
+
+    // Back Panel
+    ScopedPointer<BackPanel> backPanel;
+    //[/UserVariables]
     //==============================================================================
-    ScopedPointer<TextButton> lfoOneButton;
-    ScopedPointer<TextButton> lfoTwoButton;
-    ScopedPointer<TextButton> envOneButton;
-    ScopedPointer<TextButton> envTwoButton;
-    ScopedPointer<TextButton> stepButton;
-    ScopedPointer<TextButton> modulationButton;
-    ScopedPointer<TextButton> loadPresetButton;
-    ScopedPointer<TextButton> savePresetButton;
+    ScopedPointer<ImageButton> lfoOneButton;
+    ScopedPointer<ImageButton> lfoTwoButton;
+    ScopedPointer<ImageButton> envOneButton;
+    ScopedPointer<ImageButton> envTwoButton;
+    ScopedPointer<ImageButton> stepButton;
+    ScopedPointer<ImageButton> modulationButton;
+    ScopedPointer<ImageButton> loadPresetButton;
+    ScopedPointer<ImageButton> savePresetButton;
     ScopedPointer<Slider> InputVolumeSlider;
     ScopedPointer<WaveShapeComponent> waveShaper;
     ScopedPointer<FilterComponent> filter;
@@ -145,7 +186,7 @@ private:
     ScopedPointer<MatrixTable> modMatrix;
     ScopedPointer<FXContainer> fxContainer;
     ScopedPointer<Slider> mainVolumeSlider;
-    ScopedPointer<TextButton> presetButton;
+    ScopedPointer<ImageButton> presetButton;
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AkatekoAudioProcessorEditor)
 };

@@ -22,6 +22,7 @@
 
 //[Headers]     -- You can add your own extra header files here --
 #include "../JuceLibraryCode/JuceHeader.h"
+
 #include "/work/programming-projects/msm/msm-dsp/Common/msm.h"
 #include "/work/programming-projects/msm/msm-gui/BufferDisplay.h"
 #include "/work/programming-projects/msm/msm-gui/QTableDrawing.h"
@@ -29,8 +30,14 @@
 #include "/work/programming-projects/msm/msm-gui/ParamToggle.h"
 
 #include "Akateko.h"
+
+#include "CustomLookAndFeel.h"
+#include "SliderLookAndFeelBottomV1.h"
+#include "SliderLookAndFeelBottomV2.h"
 #include "PluginProcessor.h"
 #include <vector>
+
+
 //[/Headers]
 
 
@@ -61,14 +68,24 @@ public:
 
     msmBuffer getBuffer();
 
-    void setBeatDivisionStrings(StringArray beatDivStr);
-    void setBeatDivisionValues(std::vector<double> beatDivVal);
+//    void setBeatDivisionStrings(StringArray beatDivStr);
+//    void setBeatDivisionValues(std::vector<double> beatDivVal);
 
+    void updateFrequencySlider(double bpm);
     void initFrequencySlider();
 
     void handleCommandMessage(int commandId) override;
-
     void updateGui();
+    void midiUpdate();
+
+    void setLookAndFeel(LookAndFeel *cLaf,
+                        LookAndFeel *r1Laf,
+                        LookAndFeel *r2Laf);
+
+    void calculateTimeDivision(double bpm);
+
+
+
     //[/UserMethods]
 
     void paint (Graphics& g) override;
@@ -82,20 +99,24 @@ public:
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
     AkatekoAudioProcessor &processor;
-
+    void initialiseTimeDivisions();
     void updateParameters();
     void initialiseDefaultShapes();
     void resetShapButtonColour(int shapeButton);
     void setShape(Button *buttonThatWasClicked, int shape);
+    void initialiseMIDIStrings();
 
     int findClosestTimeDivision(double freq);
+    int getTimeDivisionIndex(vector<double> &values, double freq);
 
     msmBuffer currentBuffer;
     StringArray currentShapes;
     StringArray defaultShapes;
 
     StringArray beatDivision;
-    std::vector<double> valueBeatDivision;
+    std::vector<double> valueBeatDivision;    
+    std::vector<int>paramIndices;
+    int requestMenuIds[16];
 
     AudioProcessorParameter *frequency;
     AudioProcessorParameter *activeShape;
@@ -104,12 +125,18 @@ private:
 
     Label &labelRef;
 
-    double bpm;
+    double beatsPerMinute;
+    bool freqMidiEnabled;
     bool defaultShape;
     int lfoNumber;
 
+    PopupMenu menu;
+
     Colour buttonColour;
     Colour activeColour;
+
+    StringArray lfoOneMIDI;
+    StringArray lfoTwoMIDI;
     //[/UserVariables]
 
     //==============================================================================
@@ -117,10 +144,11 @@ private:
     ScopedPointer<Slider> lfoPhaseSlider;
     ScopedPointer<Slider> lfoFrequencySlider;
     ScopedPointer<Slider> lfoPWMSlider;
+    ScopedPointer<Slider> lfoSmoothSlider;
+
     ScopedPointer<BufferDisplay> bufferDisplay;
     ScopedPointer<ToggleButton> lfoEnableToggle;
     ScopedPointer<Label> nameLabel;
-    ScopedPointer<TextButton> resetButton;
     ScopedPointer<TextButton> shapeButtonOne;
     ScopedPointer<TextButton> shapeButtonTwo;
     ScopedPointer<TextButton> shapeButtonThree;
@@ -132,7 +160,6 @@ private:
     ScopedPointer<TextButton> loadButton;
     ScopedPointer<TextButton> clearButton;
     ScopedPointer<TextButton> saveButton;
-    ScopedPointer<TextButton> printButton;
     ScopedPointer<TextButton> oneShotButton;
     ScopedPointer<TextButton> freeRunningButton;
     ScopedPointer<TextButton> syncButton;

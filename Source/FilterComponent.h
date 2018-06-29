@@ -23,6 +23,7 @@
 //[Headers]     -- You can add your own extra header files here --
 #include "../JuceLibraryCode/JuceHeader.h"
 #include "/work/programming-projects/msm/msm-gui/QTableDrawing.h"
+#include "/work/programming-projects/msm/msm-gui/ParamImageToggle.h"
 #include "/work/programming-projects/msm/msm-gui/ParamSlider.h"
 #include "/work/programming-projects/msm/msm-gui/ParamToggle.h"
 #include "/work/programming-projects/msm/msm-gui/ParamComboBox.h"
@@ -30,6 +31,8 @@
 
 #include "Akateko.h"
 #include "PluginProcessor.h"
+#include "CustomLookAndFeel.h"
+#include "SliderLookAndFeel.h"
 //[/Headers]
 
 
@@ -57,20 +60,9 @@ public:
 
     void updateGui();
 
-    enum ParameterId {
-        FilterEnable,
-        FilterConfig,
-        FilterOneEnable,
-        FilterOneType,
-        FilterOneRollOff,
-        FilterOneFrequency,
-        FilterOneResonance,
-        FilterTwoType,
-        FilterTwoRollOff,
-        FilterTwoEnable,
-        FilterTwoFrequency,
-        FilterTwoResonance
-    };
+    void setLookAndFeel(LookAndFeel *cLaf,
+                        LookAndFeel *bLaf,
+                        LookAndFeel *sLaf);
     //[/UserMethods]
 
     void paint (Graphics& g) override;
@@ -84,18 +76,19 @@ private:
     //[UserVariables]   -- You can add your own custom variables in this section.
     void setFilterType(int &selectedIndex, int filter);
     void setFilterRollOff(int &selectedIndex, int filter);
-
     void initialiseFilterOne();
     void initialiseFilterTwo();
+    void initialiseMidiStrings();
+
+    PopupMenu menu;
+    std::vector<int> paramIndices;
+    StringArray midiStrings;
+    int requestMenuIds[18];
+
+    bool proceed = false;
 
     AkatekoAudioProcessor &processor;
     Label &labelRef;
-
-    AudioProcessorParameter *filterOnePassBand;
-    AudioProcessorParameter *filterOneVolume;
-
-    AudioProcessorParameter *filterTwoPassBand;
-    AudioProcessorParameter *filterTwoVolume;
 
     //[/UserVariables]
 
@@ -105,11 +98,11 @@ private:
     ScopedPointer<FilterDisplay> filterDisplay;
     ScopedPointer<ComboBox> filterOneTypeComboBox;
     ScopedPointer<ComboBox> filterOneRollOffComboBox;
-    ScopedPointer<ToggleButton> filterToggleButton;
+    ScopedPointer<ImageButton> filterToggleButton;
     ScopedPointer<ComboBox> filterTwoTypeComboBox;
     ScopedPointer<ComboBox> filterTwoRollOffComboBox;
-    ScopedPointer<ToggleButton> filterOneToggleButton;
-    ScopedPointer<ToggleButton> filterTwoToggleButton;
+    ScopedPointer<ImageButton> filterOneToggleButton;
+    ScopedPointer<ImageButton> filterTwoToggleButton;
     ScopedPointer<ComboBox> filterConfigComboBox;
     ScopedPointer<Slider> filterTwoDriveSlider;
     ScopedPointer<Slider> filterTwoPassBandSlider;

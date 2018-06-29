@@ -21,10 +21,16 @@
 //[/Headers]
 
 #include "FXContainer.h"
+#include "Akateko.h"
 
 
 //[MiscUserDefs] You can add your own user definitions and misc code here...
 using std::vector;
+using akateko::FXCID::updateFxGUI;
+using akateko::FXCID::updateFxBPM;
+using akateko::MidiRow;
+using akateko::IgnoreRightClick;
+using akateko::initMidiRow;
 //[/MiscUserDefs]
 
 //==============================================================================
@@ -36,10 +42,12 @@ FXContainer::FXContainer (const String &name, AkatekoAudioProcessor &p, Label &l
       effectOneUpdateId(-1),
       effectTwoUpdateId(-1),
       processor(p),
-      labelRef(label), buttonColour(Colour(0x73707070)), activeColour(Colour(0x7f007f7f))
+      labelRef(label),
+      buttonColour(Colour(0x3F10A0A0)),
+      activeColour(Colour(0x9F20BFaF))
 {
     //[Constructor_pre] You can add your own custom stuff here.
-    vector<int> paramIndices = p.getParameterIndices(AkatekoAudioProcessor::FxContainerId);
+    paramIndices = p.getParameterIndices(AkatekoAudioProcessor::FxContainerId);
     StringArray paramNames = p.getParameterIds(AkatekoAudioProcessor::FxContainerId);
     const OwnedArray<AudioProcessorParameter> &params = p.getParameters();
 
@@ -47,16 +55,21 @@ FXContainer::FXContainer (const String &name, AkatekoAudioProcessor &p, Label &l
        paramNames.size() == 4 &&
        params.size() >= paramIndices[3])
     {
-        addAndMakeVisible(enableFXToggleButton = new ParamToggle(paramNames[0], *params.getUnchecked(paramIndices[0]), label));
+        requestMenuIds[0] = paramNames[0].hash();
+        requestMenuIds[1] = paramNames[2].hash();
+        requestMenuIds[2] = paramNames[3].hash();
+
+
+        addAndMakeVisible(enableFXToggleButton = new ParamImageToggle(paramNames[0], *params.getUnchecked(paramIndices[0]), label));
         addAndMakeVisible(fxConfigComboBox = new ParamComboBox(paramNames[1], *params.getUnchecked(paramIndices[1]), label));
 
         fxInput = params.getUnchecked(paramIndices[2]);
-        addAndMakeVisible(fxInputAmp = new Slider(paramNames[2]));
+        addAndMakeVisible(fxInputAmp = new IgnoreRightClick<Slider>(paramNames[2]));
 
         fxRouting = params.getUnchecked(paramIndices[3]);
-        addAndMakeVisible(fxRoutingAmp = new Slider(paramNames[3]));
+        addAndMakeVisible(fxRoutingAmp = new IgnoreRightClick<Slider>(paramNames[3]));
     } else {
-        addAndMakeVisible (enableFXToggleButton = new ToggleButton ("enableFX"));
+        addAndMakeVisible (enableFXToggleButton = new ImageButton ("enableFX"));
         addAndMakeVisible (fxConfigComboBox = new ComboBox ("fxConfig"));
         addAndMakeVisible (fxInputAmp = new Slider ("fxInputAmp"));
         addAndMakeVisible (fxRoutingAmp = new Slider ("fxRoutingAmp"));
@@ -66,6 +79,10 @@ FXContainer::FXContainer (const String &name, AkatekoAudioProcessor &p, Label &l
     //[UserPreSize]
 
     enableFXToggleButton->setButtonText (String());
+    enableFXToggleButton->setImages(false, true, false,
+                                    ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour(0x7F000000),
+                                    ImageCache::getFromMemory (BinaryData::ToggleOff_png, BinaryData::ToggleOff_pngSize), 1.0f, Colour (0x4F20BFCF),
+                                    ImageCache::getFromMemory (BinaryData::ToggleOn_png, BinaryData::ToggleOn_pngSize), 1.0f, Colour (0x3F20BFCF));
 
     fxConfigComboBox->setEditableText (false);
     fxConfigComboBox->setJustificationType (Justification::centred);
@@ -74,28 +91,22 @@ FXContainer::FXContainer (const String &name, AkatekoAudioProcessor &p, Label &l
     fxConfigComboBox->addItem (TRANS("Series"), 1);
     fxConfigComboBox->addItem (TRANS("Parallel"), 2);
     fxConfigComboBox->addSeparator();
+    fxConfigComboBox->postCommandMessage(ParamComboBox::update);
     fxConfigComboBox->addListener (this);
 
     fxInputAmp->setTooltip (TRANS("FX Input Volume\n"));
     fxInputAmp->setRange (0, 1, 0);
     fxInputAmp->setSliderStyle (Slider::LinearBar);
     fxInputAmp->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
-    fxInputAmp->setColour (Slider::backgroundColourId, Colour (0xff003000));
-    fxInputAmp->setColour (Slider::thumbColourId, Colour (0xbb70bbbb));
-    fxInputAmp->setColour (Slider::trackColourId, Colours::white);
-    fxInputAmp->setColour (Slider::rotarySliderFillColourId, Colour (0xaa70abab));
-    fxInputAmp->setColour (Slider::rotarySliderOutlineColourId, Colour (0x66000000));
+
+
     fxInputAmp->addListener (this);
 
     fxRoutingAmp->setTooltip (TRANS("FX Routing"));
     fxRoutingAmp->setRange (0, 1, 0);
     fxRoutingAmp->setSliderStyle (Slider::LinearBar);
     fxRoutingAmp->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
-    fxRoutingAmp->setColour (Slider::backgroundColourId, Colour (0xff003000));
-    fxRoutingAmp->setColour (Slider::thumbColourId, Colour (0xbb70bbbb));
-    fxRoutingAmp->setColour (Slider::trackColourId, Colours::white);
-    fxRoutingAmp->setColour (Slider::rotarySliderFillColourId, Colour (0xaa70abab));
-    fxRoutingAmp->setColour (Slider::rotarySliderOutlineColourId, Colour (0x66000000));
+
     fxRoutingAmp->addListener (this);
 
     addAndMakeVisible (effectOne = new Component());
@@ -108,17 +119,11 @@ FXContainer::FXContainer (const String &name, AkatekoAudioProcessor &p, Label &l
     fxButtonTwo->setButtonText (TRANS("FX 2"));
     fxButtonTwo->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     fxButtonTwo->addListener (this);
-    fxButtonTwo->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    fxButtonTwo->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    fxButtonTwo->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
     addAndMakeVisible (fxButtonOne = new TextButton ("fxButtonOne"));
     fxButtonOne->setButtonText (TRANS("FX 1"));
     fxButtonOne->setConnectedEdges (Button::ConnectedOnTop | Button::ConnectedOnBottom);
     fxButtonOne->addListener (this);
-    fxButtonOne->setColour (TextButton::buttonColourId, Colour (0x73707070));
-    fxButtonOne->setColour (TextButton::buttonOnColourId, Colour (0xff464646));
-    fxButtonOne->setColour (TextButton::textColourOffId, Colour (0xfff0f0f0));
 
     addAndMakeVisible (fxEffectBox = new ComboBox ("fxEffectBox"));
     fxEffectBox->setEditableText (false);
@@ -156,7 +161,6 @@ FXContainer::FXContainer (const String &name, AkatekoAudioProcessor &p, Label &l
     String state = processor.getUIState(AkatekoAudioProcessor::FxContainerId);
     setUITState(state);
 
-
     if(activeEffect == 1){
         fxButtonOne->setColour(TextButton::buttonColourId, activeColour);
         fxEffectBox->setText(effects[effectFXOne], dontSendNotification);
@@ -164,6 +168,22 @@ FXContainer::FXContainer (const String &name, AkatekoAudioProcessor &p, Label &l
         fxButtonTwo->setColour(TextButton::buttonColourId, activeColour);
         fxEffectBox->setText(effects[effectFXTwo], dontSendNotification);
     }
+
+    // Look And Feel Methods
+    claf = new CustomLookAndFeel();
+
+    menu.setLookAndFeel(claf);
+
+    fxConfigComboBox->setLookAndFeel(claf);
+    fxEffectBox->setLookAndFeel(claf);
+    fxInputAmp->setLookAndFeel(claf);
+    fxRoutingAmp->setLookAndFeel(claf);
+    fxButtonOne->setLookAndFeel(claf);
+    fxButtonTwo->setLookAndFeel(claf);
+
+    menu.addItem(1, "learn");
+    menu.addSeparator();
+    menu.addItem(0xFF, "clear");
 
     //[/Constructor]
 }
@@ -187,6 +207,8 @@ FXContainer::~FXContainer()
     //[Destructor]. You can add your own custom destruction code here..
     fxInput = nullptr;
     fxRouting = nullptr;
+
+    claf = nullptr;  // common laf
     //[/Destructor]
 }
 
@@ -205,15 +227,16 @@ void FXContainer::resized()
     //[UserPreResize] Add your own custom resize code here..
     //[/UserPreResize]
 
-    enableFXToggleButton->setBounds (235, -1, 24, 24);
-    fxConfigComboBox->setBounds (95, 3, 66, 16);
-    fxInputAmp->setBounds (3, 3, 40, 16);
-    fxRoutingAmp->setBounds (48, 3, 40, 16);
+    enableFXToggleButton->setBounds (238, 0, 18, 18);
+    fxInputAmp->setBounds (4, 1, 40, 16);
+    fxRoutingAmp->setBounds (49, 1, 40, 16);
     effectOne->setBounds (0, 24, 256, 232);
     effectTwo->setBounds (0, 24, 256, 232);
-    fxButtonTwo->setBounds (200, 3, 32, 16);
-    fxButtonOne->setBounds (169, 3, 32, 16);
-    fxEffectBox->setBounds (88, 25, 81, 16);
+    fxButtonTwo->setBounds (202, 1, 32, 16);
+    fxButtonOne->setBounds (170, 1, 32, 16);
+
+    fxConfigComboBox->setBounds (96, 1, 66, 16);
+    fxEffectBox->setBounds (89, 24, 81, 16);
     //[UserResized] Add your own custom resize handling here..
     //[/UserResized]
 }
@@ -227,7 +250,7 @@ void FXContainer::comboBoxChanged (ComboBox* comboBoxThatHasChanged)
     {
         //[UserComboBoxCode_fxConfigComboBox] -- add your combo box handling code here..
 
-
+        // Need to implement
 
         //[/UserComboBoxCode_fxConfigComboBox]
     }
@@ -268,7 +291,14 @@ void FXContainer::sliderValueChanged (Slider* sliderThatWasMoved)
     {
         //[UserSliderCode_fxInputAmp] -- add your slider handling code here..
         const double amp = fxInputAmp->getValue();
-        String stringValue = fxInputAmp->getName() + String(amp*2.0, 2);
+        double dbValue = msm::dbConversion(amp*2.0);
+
+        if(dbValue > 6.00){dbValue = 6.00;}
+
+        String stringValue = fxInputAmp->getName() +
+                             String(dbValue, 2) +
+                             String("dB");
+
 
         fxInput->setValue(amp);
         labelRef.setText(stringValue, dontSendNotification);
@@ -277,9 +307,9 @@ void FXContainer::sliderValueChanged (Slider* sliderThatWasMoved)
     else if (sliderThatWasMoved == fxRoutingAmp)
     {
         //[UserSliderCode_fxRoutingAmp] -- add your slider handling code here..
-        const double fxRouting = fxRoutingAmp->getValue();
-        double fxOneValue = 1-fxRouting;
-        double fxTwoValue = fxRouting;
+        const double tmpRouting = fxRoutingAmp->getValue();
+        double fxOneValue = 1-tmpRouting;
+        double fxTwoValue = tmpRouting;
 
         String fxOne = String(fxOneValue, 2);
         String fxTwo = String(fxTwoValue, 2);
@@ -287,7 +317,7 @@ void FXContainer::sliderValueChanged (Slider* sliderThatWasMoved)
         String stringValue = fxRoutingAmp->getName() +
                             "[" + fxOne + "," + fxTwo + "]";
 
-        fxRoutingAmp->setValue(fxRouting);
+        fxRouting->setValue(tmpRouting);
         labelRef.setText(stringValue, dontSendNotification);
         //[/UserSliderCode_fxRoutingAmp]
     }
@@ -369,6 +399,7 @@ void FXContainer::initialiseEffectsStrings(){
     effects.add("D-Chorus");
     effects.add("H-Delay");
     effects.add("Decimator");
+    effects.add("P-Reverb");
 }
 
 void FXContainer::setEffect(int fxIndex, int effect){
@@ -381,6 +412,7 @@ void FXContainer::setEffect(int fxIndex, int effect){
                 break;
             case 2:
                 addChildComponent(effectOne = new StereoDelayComponent("Delay : ", processor, labelRef), 0);
+
                 break;
             case 3:
                 addChildComponent(effectOne = new PingPongComponent("Ping Pong : ", processor, labelRef), 0);
@@ -538,8 +570,51 @@ void FXContainer::updateGui(){
       fxRoutingAmp->setValue(routing);
   }
 
-  effectOne->postCommandMessage(0);
-  effectTwo->postCommandMessage(0);
+  effectOne->postCommandMessage(updateFxGUI);
+  effectTwo->postCommandMessage(updateFxGUI);
+}
+
+void FXContainer::updateBeatsPerMinute(){
+    effectOne->postCommandMessage(updateFxBPM);
+    effectTwo->postCommandMessage(updateFxBPM);
+}
+
+void FXContainer::handleCommandMessage(int commandId){
+    if(commandId == requestMenuIds[0]){
+        int index = menu.show();
+        handlePopupMenu(index, 0);
+    } else if(commandId == requestMenuIds[1]){
+        int index = menu.show();
+        handlePopupMenu(index, 1);
+    } else if(commandId == requestMenuIds[2]){
+        int index = menu.show();
+        handlePopupMenu(index, 2);
+    }
+}
+
+void FXContainer::handlePopupMenu(int choice, int param){
+    if(choice == 1){
+
+        if(paramIndices.size() == 4){
+            MidiRow tmpRow;
+
+            switch(param){
+                case 0: initMidiRow(tmpRow, 0, 0, 127, 0.0, 1.0, paramIndices[0], akateko::MIDI_TO_INT_TOGGLE, " FX: Enable", 9); break;
+                case 1: initMidiRow(tmpRow, 0, 0, 127, 0.0, 1.0, paramIndices[2], akateko::MIDI_TO_DOUBLE," FX: Input Vol", 9); break;
+                case 2: initMidiRow(tmpRow, 0, 0, 127, 0.0, 2.0, paramIndices[3], akateko::MIDI_TO_DOUBLE," FX: Routing", 9); break;
+            }
+
+            processor.initiateMidiLearn(tmpRow);
+        }
+    } else if(choice == 0xFF){
+        if(paramIndices.size() == 4){
+            switch(param){
+                case 0: processor.removeMidiRow(paramIndices[0]); break;
+                case 1: processor.removeMidiRow(paramIndices[2]); break;
+                case 2: processor.removeMidiRow(paramIndices[3]); break;
+            }
+        }
+    }
 }
 
 //[/MiscUserCode]
@@ -560,9 +635,9 @@ BEGIN_JUCER_METADATA
                  snapPixels="8" snapActive="1" snapShown="1" overlayOpacity="0.330"
                  fixedSize="1" initialWidth="255" initialHeight="255">
   <BACKGROUND backgroundColour="0"/>
-  <TOGGLEBUTTON name="enableFX" id="6708e88cc92f899b" memberName="enableFXToggleButton"
-                virtualName="" explicitFocusOrder="0" pos="235 -1 24 24" buttonText=""
-                connectedEdges="0" needsCallback="0" radioGroupId="0" state="0"/>
+  <IMAGEBUTTON name="enableFX" id="6708e88cc92f899b" memberName="enableFXToggleButton"
+               virtualName="" explicitFocusOrder="0" pos="235 -1 24 24" buttonText=""
+               connectedEdges="0" needsCallback="0" radioGroupId="0" state="0"/>
   <COMBOBOX name="fxConfig" id="b81e8bf731f64871" memberName="fxConfigComboBox"
             virtualName="ComboBox" explicitFocusOrder="0" pos="95 3 66 16"
             editable="0" layout="36" items="Series&#10;Parallel&#10;" textWhenNonSelected="config"
